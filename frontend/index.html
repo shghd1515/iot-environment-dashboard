@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IoT 환경 대시보드</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #F7F6F3;
+    --surface: #FFFFFF;
+    --surface2: #F0EEE9;
+    --border: #E5E2DA;
+    --text: #1A1916;
+    --text2: #6B6860;
+    --text3: #A39F95;
+    --accent: #2563EB;
+    --accent-light: #EFF6FF;
+    --good: #16A34A;
+    --good-bg: #F0FDF4;
+    --moderate: #D97706;
+    --moderate-bg: #FFFBEB;
+    --bad: #DC2626;
+    --bad-bg: #FEF2F2;
+    --very-bad: #7C3AED;
+    --very-bad-bg: #F5F3FF;
+    --temp: #E85D24;
+    --humi: #2563EB;
+    --pm25: #854F0B;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* ── 헤더 ── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+    font-size: 15px;
+    letter-spacing: -0.3px;
+  }
+  .logo-dot {
+    width: 8px; height: 8px;
+    background: var(--accent);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.3); }
+  }
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    color: var(--text3);
+    font-size: 13px;
+    font-family: 'DM Mono', monospace;
+  }
+  .status-dot {
+    width: 6px; height: 6px;
+    background: var(--good);
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 4px;
+    animation: pulse 2s infinite;
+  }
+
+  /* ── 레이아웃 ── */
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    grid-template-rows: auto;
+    gap: 0;
+    height: calc(100vh - 56px);
+  }
+  .main-panel {
+    overflow-y: auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .chat-panel {
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  /* ── 카드 ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: var(--shadow);
+  }
+  .card-title {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 16px;
+  }
+
+  /* ── 현재 수치 카드들 ── */
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+  .metric-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: var(--shadow);
+    position: relative;
+    overflow: hidden;
+  }
+  .metric-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+  }
+  .metric-card.temp::before { background: var(--temp); }
+  .metric-card.humi::before { background: var(--humi); }
+  .metric-card.pm25::before { background: var(--pm25); }
+  .metric-card.pm10::before { background: #EF9F27; }
+
+  .metric-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin-bottom: 8px;
+  }
+  .metric-value {
+    font-size: 32px;
+    font-weight: 300;
+    letter-spacing: -1px;
+    line-height: 1;
+    margin-bottom: 4px;
+    font-family: 'DM Mono', monospace;
+  }
+  .metric-unit {
+    font-size: 13px;
+    color: var(--text3);
+  }
+  .metric-diff {
+    font-size: 12px;
+    margin-top: 8px;
+    font-family: 'DM Mono', monospace;
+  }
+  .diff-up { color: var(--temp); }
+  .diff-down { color: var(--humi); }
+  .diff-ok { color: var(--good); }
+
+  /* ── PM2.5 등급 배지 ── */
+  .pm-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 500;
+    margin-top: 6px;
+  }
+  .pm-badge.good    { background: var(--good-bg);     color: var(--good); }
+  .pm-badge.moderate{ background: var(--moderate-bg); color: var(--moderate); }
+  .pm-badge.bad     { background: var(--bad-bg);      color: var(--bad); }
+  .pm-badge.very-bad{ background: var(--very-bad-bg); color: var(--very-bad); }
+
+  /* ── AI 비교 ── */
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+  }
+  .compare-item {
+    background: var(--surface2);
+    border-radius: 10px;
+    padding: 14px;
+  }
+  .compare-item-label {
+    font-size: 11px;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin-bottom: 8px;
+  }
+  .compare-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+    font-size: 13px;
+  }
+  .compare-current { font-weight: 500; font-family: 'DM Mono', monospace; }
+  .compare-ai { color: var(--accent); font-family: 'DM Mono', monospace; font-size: 12px; }
+  .compare-bar-wrap {
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin-top: 8px;
+    overflow: hidden;
+  }
+  .compare-bar { height: 100%; border-radius: 2px; transition: width 0.5s; }
+
+  /* ── 차트 ── */
+  .chart-wrap { position: relative; height: 200px; }
+
+  /* ── 테이블 ── */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th {
+    text-align: left;
+    padding: 8px 10px;
+    color: var(--text3);
+    font-weight: 500;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--text2);
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface2); }
+  .event-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    background: var(--accent-light);
+    color: var(--accent);
+  }
+  .action-text { color: var(--text2); font-size: 11px; max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ── 챗봇 패널 ── */
+  .chat-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .chat-header-icon {
+    width: 32px; height: 32px;
+    background: var(--accent-light);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent);
+    font-size: 16px;
+  }
+  .chat-header-info h3 { font-size: 14px; font-weight: 500; }
+  .chat-header-info p { font-size: 11px; color: var(--text3); }
+
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .msg {
+    display: flex;
+    gap: 8px;
+    animation: fadeIn 0.3s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; } }
+
+  .msg.user { flex-direction: row-reverse; }
+  .msg-avatar {
+    width: 28px; height: 28px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+  .msg.user .msg-avatar { background: var(--accent); color: white; }
+  .msg.ai .msg-avatar { background: var(--surface2); color: var(--text); }
+
+  .msg-bubble {
+    max-width: 260px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .msg.user .msg-bubble {
+    background: var(--accent);
+    color: white;
+    border-bottom-right-radius: 4px;
+  }
+  .msg.ai .msg-bubble {
+    background: var(--surface2);
+    color: var(--text);
+    border-bottom-left-radius: 4px;
+  }
+  .msg-time {
+    font-size: 10px;
+    color: var(--text3);
+    margin-top: 4px;
+    font-family: 'DM Mono', monospace;
+  }
+  .msg.user .msg-time { text-align: right; }
+
+  .event-detected {
+    font-size: 11px;
+    color: var(--good);
+    background: var(--good-bg);
+    padding: 4px 10px;
+    border-radius: 10px;
+    text-align: center;
+    margin: -4px 0;
+  }
+
+  .typing {
+    display: flex;
+    gap: 4px;
+    padding: 12px;
+    background: var(--surface2);
+    border-radius: 12px;
+    border-bottom-left-radius: 4px;
+    width: fit-content;
+  }
+  .typing span {
+    width: 6px; height: 6px;
+    background: var(--text3);
+    border-radius: 50%;
+    animation: bounce 1.2s infinite;
+  }
+  .typing span:nth-child(2) { animation-delay: 0.2s; }
+  .typing span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce {
+    0%,60%,100% { transform: translateY(0); }
+    30% { transform: translateY(-6px); }
+  }
+
+  .chat-suggestions {
+    padding: 12px 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    border-top: 1px solid var(--border);
+  }
+  .suggestion {
+    padding: 5px 10px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    font-size: 11px;
+    cursor: pointer;
+    color: var(--text2);
+    background: var(--surface);
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .suggestion:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+
+  .chat-input-wrap {
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 8px;
+  }
+  .chat-input {
+    flex: 1;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-family: 'DM Sans', sans-serif;
+    outline: none;
+    background: var(--surface2);
+    color: var(--text);
+    transition: border-color 0.15s;
+  }
+  .chat-input:focus { border-color: var(--accent); background: var(--surface); }
+  .chat-send {
+    width: 36px; height: 36px;
+    background: var(--accent);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 15px;
+    transition: opacity 0.15s;
+    flex-shrink: 0;
+  }
+  .chat-send:hover { opacity: 0.85; }
+  .chat-send:disabled { opacity: 0.4; cursor: default; }
+
+  /* ── 탭 ── */
+  .tabs { display: flex; gap: 2px; margin-bottom: 16px; }
+  .tab {
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    color: var(--text3);
+    transition: all 0.15s;
+  }
+  .tab.active { background: var(--accent-light); color: var(--accent); }
+  .tab:hover:not(.active) { background: var(--surface2); color: var(--text); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* ── 업데이트 시각 ── */
+  .last-updated {
+    font-size: 11px;
+    color: var(--text3);
+    font-family: 'DM Mono', monospace;
+  }
+
+  /* ── 빈 상태 ── */
+  .empty { text-align: center; color: var(--text3); padding: 24px; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    IoT 환경 대시보드
+  </div>
+  <div class="header-right">
+    <span><span class="status-dot"></span>실시간 수집 중</span>
+    <span id="last-update" class="last-updated">-</span>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- ── 메인 패널 ── -->
+  <div class="main-panel">
+
+    <!-- 현재 수치 -->
+    <div class="metrics-grid">
+      <div class="metric-card temp">
+        <div class="metric-label">온도</div>
+        <div>
+          <span class="metric-value" id="val-temp">--</span>
+          <span class="metric-unit">°C</span>
+        </div>
+        <div class="metric-diff" id="diff-temp">AI 권장 --°C</div>
+      </div>
+      <div class="metric-card humi">
+        <div class="metric-label">습도</div>
+        <div>
+          <span class="metric-value" id="val-humi">--</span>
+          <span class="metric-unit">%</span>
+        </div>
+        <div class="metric-diff" id="diff-humi">AI 권장 --%</div>
+      </div>
+      <div class="metric-card pm25">
+        <div class="metric-label">PM2.5</div>
+        <div>
+          <span class="metric-value" id="val-pm25">--</span>
+          <span class="metric-unit">μg/m³</span>
+        </div>
+        <div id="pm25-badge"><span class="pm-badge">-</span></div>
+      </div>
+      <div class="metric-card pm10">
+        <div class="metric-label">PM10</div>
+        <div>
+          <span class="metric-value" id="val-pm10">--</span>
+          <span class="metric-unit">μg/m³</span>
+        </div>
+        <div class="metric-diff" style="color:var(--text3)">미세먼지</div>
+      </div>
+    </div>
+
+    <!-- AI 비교 -->
+    <div class="card">
+      <div class="card-title">AI 권장값 vs 현재값</div>
+      <div class="compare-grid">
+        <div class="compare-item">
+          <div class="compare-item-label">온도</div>
+          <div class="compare-row">
+            <span class="compare-current" id="cmp-temp-cur">--°C</span>
+            <span class="compare-ai" id="cmp-temp-ai">AI: --°C</span>
+          </div>
+          <div class="compare-bar-wrap">
+            <div class="compare-bar" id="bar-temp" style="width:50%;background:var(--temp)"></div>
+          </div>
+        </div>
+        <div class="compare-item">
+          <div class="compare-item-label">습도</div>
+          <div class="compare-row">
+            <span class="compare-current" id="cmp-humi-cur">--%</span>
+            <span class="compare-ai" id="cmp-humi-ai">AI: --%</span>
+          </div>
+          <div class="compare-bar-wrap">
+            <div class="compare-bar" id="bar-humi" style="width:50%;background:var(--humi)"></div>
+          </div>
+        </div>
+        <div class="compare-item">
+          <div class="compare-item-label">PM2.5</div>
+          <div class="compare-row">
+            <span class="compare-current" id="cmp-pm25-cur">--</span>
+            <span class="compare-ai" id="cmp-pm25-ai">AI: --</span>
+          </div>
+          <div class="compare-bar-wrap">
+            <div class="compare-bar" id="bar-pm25" style="width:50%;background:var(--pm25)"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 시계열 차트 -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div class="card-title" style="margin:0">시계열 차트 (최근 24시간)</div>
+        <div class="tabs" style="margin:0">
+          <div class="tab active" onclick="switchChart('temp')">온도·습도</div>
+          <div class="tab" onclick="switchChart('pm')">미세먼지</div>
+        </div>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="chart-temp-humi"></canvas>
+      </div>
+      <div class="chart-wrap" style="display:none">
+        <canvas id="chart-pm"></canvas>
+      </div>
+    </div>
+
+    <!-- 이벤트 & 로그 탭 -->
+    <div class="card">
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab('events')">이벤트 기록</div>
+        <div class="tab" onclick="switchTab('logs')">AI 제어 로그</div>
+      </div>
+
+      <div class="tab-content active" id="tab-events">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>시각</th>
+                <th>이벤트</th>
+                <th>온도</th>
+                <th>습도</th>
+                <th>PM2.5</th>
+              </tr>
+            </thead>
+            <tbody id="events-tbody">
+              <tr><td colspan="5" class="empty">이벤트 없음</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="tab-content" id="tab-logs">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>시각</th>
+                <th>온도</th>
+                <th>습도</th>
+                <th>PM2.5</th>
+                <th>조치</th>
+              </tr>
+            </thead>
+            <tbody id="logs-tbody">
+              <tr><td colspan="5" class="empty">로그 없음</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── 챗봇 패널 ── -->
+  <div class="chat-panel">
+    <div class="chat-header">
+      <div class="chat-header-icon">✦</div>
+      <div class="chat-header-info">
+        <h3>Gemini AI 어시스턴트</h3>
+        <p>실내 환경 데이터 기반 분석</p>
+      </div>
+    </div>
+
+    <div class="chat-messages" id="chat-messages">
+      <div class="msg ai">
+        <div class="msg-avatar">✦</div>
+        <div>
+          <div class="msg-bubble">안녕하세요! 실내 환경 AI 어시스턴트입니다. 현재 온도, 습도, 미세먼지 상태나 환경 개선 방법에 대해 무엇이든 물어보세요.</div>
+          <div class="msg-time">방금 전</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chat-suggestions">
+      <div class="suggestion" onclick="sendSuggestion('현재 실내 공기질 어때?')">현재 공기질</div>
+      <div class="suggestion" onclick="sendSuggestion('환기 필요할까?')">환기 필요?</div>
+      <div class="suggestion" onclick="sendSuggestion('미세먼지가 높은 이유는?')">미세먼지 원인</div>
+      <div class="suggestion" onclick="sendSuggestion('환기 시작했어')">환기 시작</div>
+      <div class="suggestion" onclick="sendSuggestion('수면에 좋은 온도는?')">수면 온도</div>
+      <div class="suggestion" onclick="sendSuggestion('AI 자동제어 설명해줘')">AI 제어 설명</div>
+    </div>
+
+    <div class="chat-input-wrap">
+      <input type="text" class="chat-input" id="chat-input"
+             placeholder="메시지를 입력하세요..." onkeydown="handleKey(event)">
+      <button class="chat-send" id="chat-send" onclick="sendMessage()">➤</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── 설정 ──────────────────────────────────────────────────────────────────────
+const API = 'http://localhost:8000';
+let chatHistory = [];
+let tempHumiChart = null;
+let pmChart = null;
+let currentChartTab = 'temp';
+let recommendation = {};
+
+// ── 데이터 로드 ───────────────────────────────────────────────────────────────
+async function loadAll() {
+  await Promise.all([loadSensor(), loadEvents(), loadLogs(), loadStatus()]);
+}
+
+async function loadSensor() {
+  try {
+    const res  = await fetch(`${API}/chat/sensor`);
+    const data = await res.json();
+    updateMetrics(data.current, data.pm25_grade);
+    updateCharts(data.hourly);
+    document.getElementById('last-update').textContent =
+      '업데이트: ' + (data.current.recorded_at || '-').slice(11, 16);
+  } catch(e) { console.error('sensor:', e); }
+}
+
+async function loadStatus() {
+  try {
+    const res  = await fetch(`${API}/status`);
+    const data = await res.json();
+    recommendation = data.recommendation || {};
+    updateComparison(data.current, data.recommendation);
+  } catch(e) { console.error('status:', e); }
+}
+
+async function loadEvents() {
+  try {
+    const res   = await fetch(`${API}/chat/events`);
+    const rows  = await res.json();
+    const tbody = document.getElementById('events-tbody');
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty">이벤트 없음</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(r => `
+      <tr>
+        <td>${(r.recorded_at||'').slice(0,16)}</td>
+        <td><span class="event-badge">${r.event}</span></td>
+        <td>${r.temperature ?? '-'}°C</td>
+        <td>${r.humidity ?? '-'}%</td>
+        <td>${r.pm25 ?? '-'}</td>
+      </tr>`).join('');
+  } catch(e) { console.error('events:', e); }
+}
+
+async function loadLogs() {
+  try {
+    const res   = await fetch(`${API}/chat/logs`);
+    const rows  = await res.json();
+    const tbody = document.getElementById('logs-tbody');
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty">로그 없음</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(r => `
+      <tr>
+        <td>${(r.logged_at||'').slice(0,16)}</td>
+        <td>${r.current_temp ?? '-'}°C</td>
+        <td>${r.current_humi ?? '-'}%</td>
+        <td>${r.current_pm25 ?? '-'}</td>
+        <td class="action-text" title="${r.action||''}">${r.action||'-'}</td>
+      </tr>`).join('');
+  } catch(e) { console.error('logs:', e); }
+}
+
+// ── UI 업데이트 ───────────────────────────────────────────────────────────────
+function updateMetrics(s, grade) {
+  if (!s) return;
+  document.getElementById('val-temp').textContent = s.temperature ?? '--';
+  document.getElementById('val-humi').textContent = s.humidity ?? '--';
+  document.getElementById('val-pm25').textContent = s.pm25 ?? '--';
+  document.getElementById('val-pm10').textContent = s.pm10 ?? '--';
+
+  const pm25 = s.pm25 || 0;
+  const gradeMap = {
+    '좋음':    ['good',     '● 좋음'],
+    '보통':    ['moderate', '● 보통'],
+    '나쁨':    ['bad',      '● 나쁨'],
+    '매우나쁨':['very-bad', '● 매우나쁨'],
+  };
+  const [cls, label] = gradeMap[grade] || ['moderate', '● 보통'];
+  document.getElementById('pm25-badge').innerHTML =
+    `<span class="pm-badge ${cls}">${label}</span>`;
+}
+
+function updateComparison(cur, rec) {
+  if (!cur || !rec) return;
+  const temp = cur.temperature || 0;
+  const humi = cur.humidity || 0;
+  const pm25 = cur.pm25 || 0;
+  const rTemp = rec.temperature || 0;
+  const rHumi = rec.humidity || 0;
+  const rPm25 = rec.pm25 || 0;
+
+  document.getElementById('cmp-temp-cur').textContent = `${temp}°C`;
+  document.getElementById('cmp-temp-ai').textContent  = `AI: ${rTemp}°C`;
+  document.getElementById('cmp-humi-cur').textContent = `${humi}%`;
+  document.getElementById('cmp-humi-ai').textContent  = `AI: ${rHumi}%`;
+  document.getElementById('cmp-pm25-cur').textContent = `${pm25}`;
+  document.getElementById('cmp-pm25-ai').textContent  = `AI: ${rPm25}`;
+
+  // AI 권장 diff 표시
+  const tempDiff = (rTemp - temp).toFixed(1);
+  const humiDiff = (rHumi - humi).toFixed(1);
+  const td = document.getElementById('diff-temp');
+  const hd = document.getElementById('diff-humi');
+  td.textContent = `AI 권장 ${rTemp}°C (${tempDiff > 0 ? '+' : ''}${tempDiff}°C)`;
+  td.className = `metric-diff ${tempDiff > 0.5 ? 'diff-up' : tempDiff < -0.5 ? 'diff-down' : 'diff-ok'}`;
+  hd.textContent = `AI 권장 ${rHumi}% (${humiDiff > 0 ? '+' : ''}${humiDiff}%)`;
+  hd.className = `metric-diff ${humiDiff > 2 ? 'diff-up' : humiDiff < -2 ? 'diff-down' : 'diff-ok'}`;
+
+  // 바 비율
+  document.getElementById('bar-temp').style.width = Math.min(100, (temp / 40) * 100) + '%';
+  document.getElementById('bar-humi').style.width = Math.min(100, humi) + '%';
+  document.getElementById('bar-pm25').style.width = Math.min(100, (pm25 / 75) * 100) + '%';
+}
+
+// ── 차트 ──────────────────────────────────────────────────────────────────────
+function updateCharts(hourly) {
+  if (!hourly || !hourly.length) return;
+  const labels = hourly.map(h => (h.hour || '').slice(11, 16));
+  const temps  = hourly.map(h => h.temperature);
+  const humis  = hourly.map(h => h.humidity);
+  const pm25s  = hourly.map(h => h.pm25);
+
+  // 온도·습도 차트
+  const ctx1 = document.getElementById('chart-temp-humi').getContext('2d');
+  if (tempHumiChart) tempHumiChart.destroy();
+  tempHumiChart = new Chart(ctx1, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: '온도 (°C)', data: temps, borderColor: '#E85D24',
+          backgroundColor: 'rgba(232,93,36,0.08)', fill: true,
+          tension: 0.4, pointRadius: 2, yAxisID: 'y' },
+        { label: '습도 (%)', data: humis, borderColor: '#2563EB',
+          backgroundColor: 'rgba(37,99,235,0.08)', fill: true,
+          tension: 0.4, pointRadius: 2, yAxisID: 'y2' },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { labels: { font: { family: 'DM Sans', size: 11 } } } },
+      scales: {
+        y:  { position: 'left',  ticks: { font: { family: 'DM Mono', size: 10 } }, grid: { color: '#E5E2DA' } },
+        y2: { position: 'right', ticks: { font: { family: 'DM Mono', size: 10 } }, grid: { display: false } },
+        x:  { ticks: { font: { family: 'DM Mono', size: 10 }, maxTicksLimit: 8 }, grid: { color: '#E5E2DA' } },
+      }
+    }
+  });
+
+  // 미세먼지 차트
+  const ctx2 = document.getElementById('chart-pm').getContext('2d');
+  if (pmChart) pmChart.destroy();
+  pmChart = new Chart(ctx2, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'PM2.5', data: pm25s, backgroundColor: 'rgba(133,79,11,0.7)', borderRadius: 3 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { font: { family: 'DM Sans', size: 11 } } } },
+      scales: {
+        y: { ticks: { font: { family: 'DM Mono', size: 10 } }, grid: { color: '#E5E2DA' } },
+        x: { ticks: { font: { family: 'DM Mono', size: 10 }, maxTicksLimit: 8 }, grid: { display: false } },
+      }
+    }
+  });
+}
+
+function switchChart(tab) {
+  currentChartTab = tab;
+  const wraps = document.querySelectorAll('.chart-wrap');
+  wraps[0].style.display = tab === 'temp' ? 'block' : 'none';
+  wraps[1].style.display = tab === 'pm'   ? 'block' : 'none';
+  document.querySelectorAll('.card .tabs .tab').forEach((t, i) => {
+    t.classList.toggle('active', (i === 0 && tab === 'temp') || (i === 1 && tab === 'pm'));
+  });
+}
+
+// ── 탭 전환 ───────────────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById(`tab-${name}`).classList.add('active');
+  const tabs = document.querySelectorAll('.card:last-child .tab');
+  tabs.forEach((t, i) => {
+    t.classList.toggle('active',
+      (i === 0 && name === 'events') || (i === 1 && name === 'logs'));
+  });
+}
+
+// ── 챗봇 ──────────────────────────────────────────────────────────────────────
+function now() {
+  return new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function appendMsg(role, text, detectedEvent) {
+  const wrap = document.getElementById('chat-messages');
+  const div  = document.createElement('div');
+  div.className = `msg ${role}`;
+
+  if (role === 'user') {
+    div.innerHTML = `
+      <div class="msg-avatar">나</div>
+      <div>
+        <div class="msg-bubble">${text}</div>
+        <div class="msg-time">${now()}</div>
+      </div>`;
+  } else {
+    div.innerHTML = `
+      <div class="msg-avatar">✦</div>
+      <div>
+        <div class="msg-bubble">${text}</div>
+        <div class="msg-time">${now()}</div>
+      </div>`;
+  }
+  wrap.appendChild(div);
+
+  if (detectedEvent) {
+    const ev = document.createElement('div');
+    ev.className = 'event-detected';
+    ev.textContent = `✓ 이벤트 기록: ${detectedEvent}`;
+    wrap.appendChild(ev);
+  }
+  wrap.scrollTop = wrap.scrollHeight;
+}
+
+function showTyping() {
+  const wrap = document.getElementById('chat-messages');
+  const div  = document.createElement('div');
+  div.className = 'msg ai';
+  div.id = 'typing-indicator';
+  div.innerHTML = `
+    <div class="msg-avatar">✦</div>
+    <div class="typing"><span></span><span></span><span></span></div>`;
+  wrap.appendChild(div);
+  wrap.scrollTop = wrap.scrollHeight;
+}
+
+function removeTyping() {
+  const el = document.getElementById('typing-indicator');
+  if (el) el.remove();
+}
+
+async function sendMessage() {
+  const input = document.getElementById('chat-input');
+  const msg   = input.value.trim();
+  if (!msg) return;
+
+  input.value = '';
+  document.getElementById('chat-send').disabled = true;
+  appendMsg('user', msg);
+  chatHistory.push({ role: 'user', content: msg });
+  showTyping();
+
+  try {
+    const res  = await fetch(`${API}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg, history: chatHistory.slice(-6) }),
+    });
+    const data = await res.json();
+    removeTyping();
+    appendMsg('ai', data.answer, data.detected_event);
+    chatHistory.push({ role: 'ai', content: data.answer });
+
+    // 이벤트 기록됐으면 이벤트 목록 새로고침
+    if (data.detected_event) setTimeout(loadEvents, 2000);
+  } catch(e) {
+    removeTyping();
+    appendMsg('ai', '서버 연결에 실패했습니다. FastAPI 서버가 실행 중인지 확인해주세요.');
+  }
+  document.getElementById('chat-send').disabled = false;
+  input.focus();
+}
+
+function sendSuggestion(text) {
+  document.getElementById('chat-input').value = text;
+  sendMessage();
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+}
+
+// ── 초기화 + 자동 갱신 ───────────────────────────────────────────────────────
+loadAll();
+setInterval(loadAll, 10000);  // 1분마다 갱신
+</script>
+</body>
+</html>

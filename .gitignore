@@ -1,0 +1,27 @@
+# 환경변수 (API 키 노출 방지)
+.env
+**/.env
+
+# 모델 파일 (용량 큼)
+models/
+**/models/*.pkl
+
+# CSV
+sensor_cleaned.csv
+**/sensor_cleaned.csv
+
+# EDA 결과 이미지
+eda_output/
+**/eda_output/
+
+# Python 캐시
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+
+# data 폴더
+data/
+
+# Jupyter
+.ipynb_checkpoints/
