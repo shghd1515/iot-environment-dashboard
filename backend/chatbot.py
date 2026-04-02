@@ -63,14 +63,13 @@ def get_latest_sensor() -> dict:
 
 
 def get_hourly_data() -> list:
-    """최근 24시간 시간대별 평균"""
     sql = """SELECT 
-                DATE_FORMAT(recorded_at, '%Y-%m-%d %H:00') as hour_label,
-                ROUND(AVG(temperature), 1) as avg_temp,
-                ROUND(AVG(humidity), 1)    as avg_humi,
-                ROUND(AVG(pm25), 1)        as avg_pm25
+                TO_CHAR(DATE_TRUNC('hour', recorded_at), 'YYYY-MM-DD HH24:00') as hour_label,
+                ROUND(AVG(temperature)::numeric, 1) as avg_temp,
+                ROUND(AVG(humidity)::numeric, 1)    as avg_humi,
+                ROUND(AVG(pm25)::numeric, 1)        as avg_pm25
              FROM sensor_combined
-             WHERE recorded_at >= NOW() - INTERVAL 24 HOUR
+             WHERE recorded_at >= NOW() - INTERVAL '24 hours'
              GROUP BY hour_label
              ORDER BY hour_label ASC"""
     try:
