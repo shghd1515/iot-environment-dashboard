@@ -219,6 +219,20 @@ def dashboard():
         return FileResponse(path)
     return {"message": f"frontend 경로 없음: {path}"}
 
+@app.get("/login", summary="로그인 페이지")
+def login_page():
+    path = os.path.join(FRONTEND_DIR, "login.html")
+    if os.path.exists(path):
+        return FileResponse(path)
+    return {"message": "login.html 없음"}
+
+@app.get("/admin", summary="관리자 페이지")
+def admin_page():
+    path = os.path.join(FRONTEND_DIR, "admin.html")
+    if os.path.exists(path):
+        return FileResponse(path)
+    return {"message": "admin.html 없음"}
+
 @app.get("/status", summary="현재 센서값 + AI 권장값", tags=["ML 제어"])
 def get_status():
     s = get_latest_sensor(); now = datetime.now(); w = int(now.weekday() >= 5)
