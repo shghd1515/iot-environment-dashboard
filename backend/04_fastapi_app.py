@@ -31,6 +31,9 @@ load_dotenv()
 
 # ── DB 연결 ───────────────────────────────────────────────────────────────────
 def get_engine():
+    supabase_url = os.getenv("SUPABASE_DB_URL")
+    if supabase_url:
+        return create_engine(supabase_url, pool_pre_ping=True)
     url = (
         f"mysql+pymysql://{os.getenv('DB_USER','root01')}:{os.getenv('DB_PASSWORD','00000')}"
         f"@{os.getenv('DB_HOST','192.168.101.2')}:{os.getenv('DB_PORT','3307')}"
