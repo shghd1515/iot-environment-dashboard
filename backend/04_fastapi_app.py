@@ -222,13 +222,15 @@ def dashboard():
 @app.get("/login", summary="로그인 페이지")
 def login_page():
     path = os.path.join(FRONTEND_DIR, "login.html")
+    print(f"[DEBUG] login path: {path}, exists: {os.path.exists(path)}")
     if os.path.exists(path):
         return FileResponse(path)
-    return {"message": "login.html 없음"}
+    return {"message": f"login.html 없음: {path}"}
 
 @app.get("/admin", summary="관리자 페이지")
 def admin_page():
     path = os.path.join(FRONTEND_DIR, "admin.html")
+    print(f"[DEBUG] admin path: {path}, exists: {os.path.exists(path)}")
     if os.path.exists(path):
         return FileResponse(path)
     return {"message": "admin.html 없음"}
