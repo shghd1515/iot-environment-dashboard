@@ -139,7 +139,7 @@ app.add_middleware(
 app.include_router(chatbot_router)
 
 # frontend 정적 파일 서빙
-FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend")
+FRONTEND_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend")
 if os.path.exists(FRONTEND_DIR):
     app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 
@@ -214,9 +214,10 @@ class EventRequest(BaseModel):
 @app.get("/", summary="대시보드 UI")
 def dashboard():
     path = os.path.join(FRONTEND_DIR, "index.html")
+    print(f"[DEBUG] frontend path: {path}, exists: {os.path.exists(path)}")
     if os.path.exists(path):
         return FileResponse(path)
-    return {"message": "frontend/index.html 파일을 확인해주세요"}
+    return {"message": f"frontend 경로 없음: {path}"}
 
 @app.get("/status", summary="현재 센서값 + AI 권장값", tags=["ML 제어"])
 def get_status():
