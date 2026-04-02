@@ -1,0 +1,21 @@
+name: 자동 ML 재학습
+
+on:
+  schedule:
+    - cron: '0 18 * * 0'  # 매주 일요일 오전 3시 (KST)
+  workflow_dispatch:       # 수동 실행 버튼
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Render 서버 깨우기
+        run: |
+          curl https://iot-environment-dashboard.onrender.com/ || true
+          sleep 30
+
+      - name: ML 재학습 트리거
+        run: |
+          curl -X POST https://iot-environment-dashboard.onrender.com/retrain \
+          -H "Content-Type: application/json"
+          echo "재학습 요청 완료"
