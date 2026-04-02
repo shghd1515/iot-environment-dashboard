@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>IoT 환경 대시보드</title>
@@ -958,7 +959,17 @@ function handleKey(e) {
 
 // ── 초기화 + 자동 갱신 ───────────────────────────────────────────────────────
 loadAll();
-setInterval(loadAll, 10000);  // 1분마다 갱신
+setInterval(loadAll, 10000);  // 10초마다 갱신
+// Supabase 인증 확인
+const SUPABASE_URL  = 'https://qazlmymqkzlgqrptjjxk.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhemxteW1xa3psZ3FycHRqanhrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjUyNjIsImV4cCI6MjA5MDYwMTI2Mn0.RcjTa9rWImbadoBH56bg3G1Zopwixz4exVCqh1u6D00';
+const { createClient } = window.supabase || {};
+if (createClient) {
+  const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
+  sb.auth.getSession().then(({ data }) => {
+    if (!data.session) window.location.href = '/login';
+  });
+}
 </script>
 </body>
 </html>
