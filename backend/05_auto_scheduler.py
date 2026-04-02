@@ -27,6 +27,21 @@ load_dotenv()
 API_BASE           = os.getenv("API_BASE", "http://localhost:8000")
 CHECK_INTERVAL_MIN = 1
 
+# 텔레그램 설정
+TELEGRAM_TOKEN   = "8741549548:AAEb0QB0F1CRoLkIp3waEEfODcpsUqyu_OE"
+TELEGRAM_CHAT_ID = "8717882823"
+
+def send_telegram(message: str):
+    """텔레그램 알림 전송"""
+    try:
+        requests.post(
+            f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+            data={"chat_id": TELEGRAM_CHAT_ID, "text": message},
+            timeout=5
+        )
+        print(f"[텔레그램] 알림 전송: {message}")
+    except Exception as e:
+        print(f"[텔레그램 오류] {e}")
 
 # ── DB 연결 ───────────────────────────────────────────────────────────────────
 def get_engine():
@@ -121,7 +136,12 @@ def ventilation_alarm():
     print("\n" + "🔔 "*20)
     print("★ 오후 2시입니다! 지금 창문을 열어 15분간 환기하세요! ★")
     print("🔔 "*20 + "\n")
-
+    # 텔레그램 알림 추가
+    send_telegram(
+        "🪟 환기 알림!\n"
+        "지금 창문을 열어 15분간 환기하세요!\n"
+        f"대시보드: https://iot-environment-dashboard.onrender.com"
+    )
     # FastAPI로 이벤트 기록 요청
     try:
         requests.post(f"{API_BASE}/event",
@@ -135,6 +155,12 @@ def ventilation_end():
     print("\n" + "="*50)
     print("★ 15분 환기 완료! 창문을 닫으세요. ★")
     print("="*50 + "\n")
+    # 텔레그램 알림 추가
+    send_telegram(
+        "🪟 환기 종료 알림!\n"
+        "15분간 환기 완료! 창문을 닫으세요.\n"
+        f"대시보드: https://iot-environment-dashboard.onrender.com"
+    )
     try:
         requests.post(f"{API_BASE}/event",
                       json={"event_name": "환기종료"}, timeout=5)
@@ -170,6 +196,39 @@ def auto_control_job():
         action = control_device(curr_temp, tgt_temp, curr_humi, tgt_humi,
                                 curr_pm25, tgt_pm25)
         print(f"  조치: {action}")
+
+        # 텔레그램 알림 조건
+        if curr_pm25 >= 35:
+            send_telegram(
+                f"🚨 미세먼지 경보!\n"
+                f"PM2.5: {curr_pm25} μg/m³ (나쁨 이상)\n"
+                f"현재 온도: {curr_temp}°C / 습도: {curr_humi}%\n"
+                f"대시보드: https://iot-environment-dashboard.onrender.com"
+            )
+        if curr_temp >= 28:
+            send_telegram(
+                f"🌡️ 온도 높음 경보!\n"
+                f"현재 온도: {curr_temp}°C\n"
+                f"대시보드: https://iot-environment-dashboard.onrender.com"
+            )
+        if curr_temp <= 15:
+            send_telegram(
+                f"🥶 온도 낮음 경보!\n"
+                f"현재 온도: {curr_temp}°C\n"
+                f"대시보드: https://iot-environment-dashboard.onrender.com"
+            )
+        if curr_humi >= 70:
+            send_telegram(
+                f"💧 습도 높음 경보!\n"
+                f"현재 습도: {curr_humi}%\n"
+                f"대시보드: https://iot-environment-dashboard.onrender.com"
+            )
+        if curr_humi <= 30:
+            send_telegram(
+                f"🏜️ 습도 낮음 경보!\n"
+                f"현재 습도: {curr_humi}%\n"
+                f"대시보드: https://iot-environment-dashboard.onrender.com"
+            )
 
         log_control({
             "hour":       now.hour,
