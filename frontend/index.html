@@ -674,6 +674,17 @@
         <h3>Gemini AI 어시스턴트</h3>
         <p>실내 환경 데이터 기반 분석</p>
       </div>
+      <button onclick="toggleChat()" style="
+        margin-left: auto;
+        background: none;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 4px 10px;
+        cursor: pointer;
+        font-size: 12px;
+        color: var(--text2);
+        font-family: 'DM Sans', sans-serif;
+      " id="collapse-btn">접기 ◀</button>
     </div>
 
     <div class="chat-messages" id="chat-messages">
@@ -1038,6 +1049,8 @@ function toggleChat() {
   const collapsed = chatPanel.classList.toggle('collapsed');
   resizer.style.display = collapsed ? 'none' : 'block';
   toggleBtn.textContent = collapsed ? '✦' : '✕';
+  const btn = document.getElementById('collapse-btn');
+  if (btn) btn.textContent = collapsed ? '펼치기 ▶' : '접기 ◀';
 }
 
 toggleBtn.classList.add('visible');
