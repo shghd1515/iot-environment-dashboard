@@ -95,11 +95,18 @@
 
   /* ── 레이아웃 ── */
   .layout {
-    display: grid;
-    grid-template-columns: 1fr 360px;
-    grid-template-rows: auto;
-    gap: 0;
+    display: flex;
     height: calc(100vh - 56px);
+    overflow: hidden;
+  }
+  .main-panel {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-width: 0;
   }
   .main-panel {
     overflow-y: auto;
@@ -109,12 +116,55 @@
     gap: 20px;
   }
   .chat-panel {
-    background: var(--surface);
-    border-left: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-  }
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 360px;
+  min-width: 200px;
+  max-width: 600px;
+  flex-shrink: 0;
+  position: relative;
+  transition: width 0.1s;
+}
+.chat-panel.collapsed {
+  width: 0 !important;
+  min-width: 0;
+  overflow: hidden;
+  border-left: none;
+}
+.resizer {
+  width: 5px;
+  background: var(--border);
+  cursor: col-resize;
+  flex-shrink: 0;
+  transition: background 0.15s;
+  position: relative;
+  z-index: 10;
+}
+.resizer:hover { background: var(--accent); }
+.toggle-chat-btn {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 44px;
+  height: 44px;
+  background: var(--accent);
+  border: none;
+  border-radius: 50%;
+  color: white;
+  font-size: 18px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(37,99,235,0.4);
+  z-index: 200;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.15s;
+}
+.toggle-chat-btn:hover { opacity: 0.85; }
+.toggle-chat-btn.visible { display: flex; }
 
   /* ── 카드 ── */
   .card {
@@ -477,6 +527,7 @@
   </div>
 </header>
 
+<button class="toggle-chat-btn" id="toggle-chat-btn" onclick="toggleChat()">✦</button>
 <div class="layout">
 
   <!-- ── 메인 패널 ── -->
@@ -621,7 +672,8 @@
   </div>
 
   <!-- ── 챗봇 패널 ── -->
-  <div class="chat-panel">
+  <div class="resizer" id="resizer"></div>
+  <div class="chat-panel" id="chat-panel">
     <div class="chat-header">
       <div class="chat-header-icon">✦</div>
       <div class="chat-header-info">
@@ -960,6 +1012,41 @@ function handleKey(e) {
 // ── 초기화 + 자동 갱신 ───────────────────────────────────────────────────────
 loadAll();
 setInterval(loadAll, 10000);  // 10초마다 갱신
+// ── 챗봇 패널 리사이저 ──────────────────
+const resizer   = document.getElementById('resizer');
+const chatPanel = document.getElementById('chat-panel');
+const toggleBtn = document.getElementById('toggle-chat-btn');
+let isResizing  = false;
+
+resizer.addEventListener('mousedown', (e) => {
+  isResizing = true;
+  document.body.style.cursor = 'col-resize';
+  document.body.style.userSelect = 'none';
+});
+
+document.addEventListener('mousemove', (e) => {
+  if (!isResizing) return;
+  const layout = document.querySelector('.layout');
+  const rect   = layout.getBoundingClientRect();
+  const newWidth = rect.right - e.clientX;
+  if (newWidth >= 200 && newWidth <= 600) {
+    chatPanel.style.width = newWidth + 'px';
+  }
+});
+
+document.addEventListener('mouseup', () => {
+  isResizing = false;
+  document.body.style.cursor = '';
+  document.body.style.userSelect = '';
+});
+
+function toggleChat() {
+  const collapsed = chatPanel.classList.toggle('collapsed');
+  resizer.style.display = collapsed ? 'none' : 'block';
+  toggleBtn.textContent = collapsed ? '✦' : '✕';
+}
+
+toggleBtn.classList.add('visible');
 // Supabase 인증 확인
 const SUPABASE_URL  = 'https://qazlmymqkzlgqrptjjxk.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhemxteW1xa3psZ3FycHRqanhrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjUyNjIsImV4cCI6MjA5MDYwMTI2Mn0.RcjTa9rWImbadoBH56bg3G1Zopwixz4exVCqh1u6D00';
