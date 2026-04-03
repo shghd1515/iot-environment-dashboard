@@ -127,24 +127,68 @@ def pm25_grade(val) -> str:
 def build_context() -> str:
     s      = get_latest_sensor()
     events = get_event_list()[:5]
+    hourly = get_hourly_data()
     now    = datetime.now()
 
     pm25_val   = s.get("pm25") or 0
+    temp_val   = s.get("temperature") or 0
+    humi_val   = s.get("humidity") or 0
+
     event_text = "\n".join(
         f"  {e['recorded_at']}: {e['event']} (온도 {e['temperature']}°C, PM2.5 {e['pm25']})"
         for e in events
     ) or "없음"
 
+    # 이상 패턴 분석
+    pattern_text = "데이터 없음"
+    if len(hourly) >= 3:
+        pm25_list  = [h["pm25"] for h in hourly if h["pm25"] is not None]
+        temp_list  = [h["temperature"] for h in hourly if h["temperature"] is not None]
+        if pm25_list:
+            avg_pm25 = sum(pm25_list) / len(pm25_list)
+            max_pm25 = max(pm25_list)
+            min_pm25 = min(pm25_list)
+            pattern_text = f"PM2.5 평균 {avg_pm25:.1f} / 최고 {max_pm25:.1f} / 최저 {min_pm25:.1f} μg/m³"
+        if temp_list:
+            avg_temp = sum(temp_list) / len(temp_list)
+            pattern_text += f"\n  온도 평균 {avg_temp:.1f}°C (24시간 기준)"
+
+    # 환경 개선 추천 힌트
+    recommendations = []
+    if pm25_val >= 35:
+        recommendations.append("미세먼지가 나쁨 수준입니다. 환기를 권장합니다.")
+    if pm25_val >= 75:
+        recommendations.append("미세먼지가 매우 나쁨 수준입니다. 즉시 환기하고 마스크 착용을 권장합니다.")
+    if temp_val >= 28:
+        recommendations.append("실내 온도가 높습니다. 냉방 또는 환기를 권장합니다.")
+    if temp_val <= 15:
+        recommendations.append("실내 온도가 낮습니다. 난방을 권장합니다.")
+    if humi_val >= 70:
+        recommendations.append("습도가 높습니다. 제습기 사용 또는 환기를 권장합니다.")
+    if humi_val <= 30:
+        recommendations.append("습도가 낮습니다. 가습기 사용을 권장합니다.")
+    if not recommendations:
+        recommendations.append("현재 실내 환경은 전반적으로 양호합니다.")
+
+    recommendation_text = "\n".join(f"  - {r}" for r in recommendations)
+
     return f"""
 당신은 스마트홈 IoT 환경 관리 AI 어시스턴트입니다.
 사용자의 실내 환경 데이터를 분석하고 친절하고 실용적으로 답변하세요.
 답변은 한국어로 2~4문장으로 간결하게 작성하세요.
+구체적인 수치를 언급하며 실질적인 행동을 추천하세요.
 
 ## 현재 실내 환경 ({now.strftime('%Y-%m-%d %H:%M')})
-- 온도: {s.get('temperature', 'N/A')}°C
-- 습도: {s.get('humidity', 'N/A')}%
+- 온도: {temp_val}°C
+- 습도: {humi_val}%
 - PM2.5: {pm25_val} μg/m³ ({pm25_grade(pm25_val)})
 - PM10: {s.get('pm10', 'N/A')} μg/m³
+
+## 24시간 환경 패턴 분석
+{pattern_text}
+
+## AI 환경 개선 추천
+{recommendation_text}
 
 ## 최근 이벤트
 {event_text}
@@ -154,6 +198,12 @@ def build_context() -> str:
 - 1분마다 온도·습도·미세먼지 자동 제어 판단
 - ML 모델로 시간대별 최적 환경값 예측
 - 미세먼지 기준: 좋음(0~15) / 보통(15~35) / 나쁨(35~75) / 매우나쁨(75+)
+
+## 답변 가이드
+- 현재 수치를 언급하며 구체적으로 답변하세요
+- 환기 필요 시 예상 효과를 수치로 제시하세요
+- 이벤트 패턴이 있으면 언급하세요
+- 행동 추천은 명확하고 실용적으로 하세요
 """.strip()
 
 
