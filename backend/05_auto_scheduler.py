@@ -43,6 +43,61 @@ def send_telegram(message: str):
     except Exception as e:
         print(f"[텔레그램 오류] {e}")
 
+# 이전 값 저장용
+prev_values = {"temp": None, "humi": None, "pm25": None}
+
+def detect_anomaly(curr_temp, curr_humi, curr_pm25):
+    """이상치 감지 및 알림"""
+    global prev_values
+
+    alerts = []
+
+    if prev_values["pm25"] is not None and prev_values["pm25"] > 0:
+        pm25_change = (curr_pm25 - prev_values["pm25"]) / prev_values["pm25"] * 100
+        if pm25_change >= 50:
+            alerts.append(
+                f"🚨 미세먼지 급등 감지!\n"
+                f"PM2.5: {prev_values['pm25']} → {curr_pm25} μg/m³ (+{pm25_change:.0f}%)\n"
+                f"원인: 요리·청소·외부 유입 가능성"
+            )
+
+    if prev_values["temp"] is not None:
+        temp_change = abs(curr_temp - prev_values["temp"])
+        if temp_change >= 3:
+            direction = "상승" if curr_temp > prev_values["temp"] else "하강"
+            alerts.append(
+                f"🌡️ 온도 급변 감지!\n"
+                f"온도: {prev_values['temp']}°C → {curr_temp}°C ({direction} {temp_change:.1f}°C)"
+            )
+
+    if prev_values["humi"] is not None:
+        humi_change = abs(curr_humi - prev_values["humi"])
+        if humi_change >= 10:
+            direction = "상승" if curr_humi > prev_values["humi"] else "하강"
+            alerts.append(
+                f"💧 습도 급변 감지!\n"
+                f"습도: {prev_values['humi']}% → {curr_humi}% ({direction} {humi_change:.1f}%)"
+            )
+
+    for alert in alerts:
+        msg = f"{alert}\n대시보드: https://iot-environment-dashboard.onrender.com"
+        send_telegram(msg)
+        print(f"[이상치 감지] {alert}")
+        try:
+            with engine.connect() as conn:
+                conn.execute(text(
+                    "UPDATE sensor_combined SET event = :e "
+                    "WHERE recorded_at = (SELECT MAX(recorded_at) FROM "
+                    "(SELECT recorded_at FROM sensor_combined) AS t)"
+                ), {"e": "이상치감지"})
+                conn.commit()
+        except Exception as e:
+            print(f"[이상치 DB 오류] {e}")
+
+    prev_values["temp"] = curr_temp
+    prev_values["humi"] = curr_humi
+    prev_values["pm25"] = curr_pm25
+
 # ── DB 연결 ───────────────────────────────────────────────────────────────────
 def get_engine():
     supabase_url = os.getenv("SUPABASE_DB_URL")
@@ -171,6 +226,47 @@ def ventilation_end():
     except Exception as e:
         print(f"[이벤트 오류] {e}")
 
+def weekly_report():
+    """매주 일요일 저녁 8시 주간 리포트 텔레그램 발송"""
+    print("[주간 리포트] 생성 중...")
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT
+                    ROUND(AVG(temperature)::numeric, 1) as avg_temp,
+                    ROUND(MIN(temperature)::numeric, 1) as min_temp,
+                    ROUND(MAX(temperature)::numeric, 1) as max_temp,
+                    ROUND(AVG(humidity)::numeric, 1)    as avg_humi,
+                    ROUND(AVG(pm25)::numeric, 1)        as avg_pm25,
+                    ROUND(MAX(pm25)::numeric, 1)        as max_pm25,
+                    COUNT(*) as total,
+                    COUNT(CASE WHEN event IS NOT NULL THEN 1 END) as event_count
+                FROM sensor_combined
+                WHERE recorded_at >= NOW() - INTERVAL '7 days'
+            """)).fetchone()
+
+        if result:
+            pm25_grade = "좋음" if result[4] < 15 else "보통" if result[4] < 35 else "나쁨"
+            msg = (
+                f"📊 주간 환경 리포트\n"
+                f"{'='*25}\n"
+                f"📅 기간: 최근 7일\n\n"
+                f"🌡️ 온도\n"
+                f"  평균: {result[0]}°C\n"
+                f"  최저: {result[1]}°C / 최고: {result[2]}°C\n\n"
+                f"💧 습도\n"
+                f"  평균: {result[3]}%\n\n"
+                f"🌫️ 미세먼지 (PM2.5)\n"
+                f"  평균: {result[4]} μg/m³ ({pm25_grade})\n"
+                f"  최고: {result[5]} μg/m³\n\n"
+                f"📝 수집 데이터: {result[6]:,}개\n"
+                f"🔔 이벤트 기록: {result[7]}회\n\n"
+                f"대시보드: https://iot-environment-dashboard.onrender.com"
+            )
+            send_telegram(msg)
+            print("[주간 리포트] 전송 완료")
+    except Exception as e:
+        print(f"[주간 리포트 오류] {e}")
 
 # ── 핵심 작업: 매 분 실행 ─────────────────────────────────────────────────────
 def auto_control_job():
@@ -200,6 +296,8 @@ def auto_control_job():
                                 curr_pm25, tgt_pm25)
         print(f"  조치: {action}")
 
+        # ── 이상치 감지 ──────────────────────────────
+        detect_anomaly(curr_temp, curr_humi, curr_pm25)
         # 텔레그램 알림 조건
         if curr_pm25 >= 35:
             send_telegram(
@@ -278,6 +376,11 @@ def main():
     scheduler.add_job(ventilation_end, "cron",
                       hour=14, minute=15, id="ventilation_end")
 
+    # 매주 일요일 저녁 8시 주간 리포트
+    scheduler.add_job(weekly_report, "cron",
+                      day_of_week="sun", hour=20, minute=0,
+                      id="weekly_report")
+    
     try:
         scheduler.start()
     except KeyboardInterrupt:
