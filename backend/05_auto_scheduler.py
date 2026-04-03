@@ -45,6 +45,9 @@ def send_telegram(message: str):
 
 # ── DB 연결 ───────────────────────────────────────────────────────────────────
 def get_engine():
+    supabase_url = os.getenv("SUPABASE_DB_URL")
+    if supabase_url:
+        return create_engine(supabase_url, pool_pre_ping=True)
     url = (
         f"mysql+pymysql://{os.getenv('DB_USER','root01')}:{os.getenv('DB_PASSWORD','00000')}"
         f"@{os.getenv('DB_HOST','192.168.101.2')}:{os.getenv('DB_PORT','3307')}"
@@ -56,9 +59,9 @@ engine = get_engine()
 
 CREATE_LOG_TABLE = """
 CREATE TABLE IF NOT EXISTS control_log (
-    id              INT AUTO_INCREMENT PRIMARY KEY,
-    logged_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    hour_of_day     TINYINT  NOT NULL,
+    id              SERIAL PRIMARY KEY,
+    logged_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    hour_of_day     SMALLINT,
     current_temp    FLOAT,
     current_humi    FLOAT,
     current_pm25    FLOAT,
