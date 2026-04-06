@@ -175,17 +175,71 @@ def get_latest_sensor() -> dict:
 
 def get_recommendation(hour, is_weekend, curr_temp, curr_humi, curr_pm25=0.0):
     def _pattern():
+        # 1. 저장된 hourly_pattern 사용
         if store.hourly_pattern:
             p = store.hourly_pattern.get((hour, is_weekend)) or \
                 store.hourly_pattern.get((hour, 0))
             if p:
                 return {"temperature": p.get("target_temp", 22.0),
-                        "humidity": p.get("target_humi", 50.0),
-                        "pm25": p.get("target_pm25", 20.0)}
-        return {"temperature": 22.0, "humidity": 50.0, "pm25": 20.0}
+                        "humidity":    p.get("target_humi", 50.0),
+                        "pm25":        p.get("target_pm25", 20.0)}
+
+        # 2. DB에서 시간대별 평균값 동적 계산
+        try:
+            with get_engine().connect() as conn:
+                row = conn.execute(text("""
+                    SELECT
+                        ROUND(AVG(temperature)::numeric, 1) as avg_temp,
+                        ROUND(AVG(humidity)::numeric, 1)    as avg_humi,
+                        ROUND(AVG(pm25)::numeric, 1)        as avg_pm25
+                    FROM sensor_combined
+                    WHERE EXTRACT(HOUR FROM recorded_at) = :hour
+                      AND pm25 IS NOT NULL
+                      AND recorded_at >= NOW() - INTERVAL '30 days'
+                """), {"hour": hour}).fetchone()
+
+                if row and row[0]:
+                    return {
+                        "temperature": float(row[0]),
+                        "humidity":    float(row[1]),
+                        "pm25":        float(row[2]),
+                    }
+        except Exception as e:
+            print(f"[패턴 룩업 오류] {e}")
+
+        # 3. 시간대별 기본값 (계절 고려)
+        import datetime
+        month = datetime.datetime.now().month
+        # 봄/가을: 20°C, 여름: 25°C, 겨울: 18°C
+        if month in [3, 4, 5, 9, 10, 11]:
+            base_temp = 20.0
+        elif month in [6, 7, 8]:
+            base_temp = 25.0
+        else:
+            base_temp = 18.0
+
+        # 시간대별 온도 보정
+        if 6 <= hour <= 10:
+            temp_adj = -1.0   # 아침은 약간 낮게
+        elif 13 <= hour <= 17:
+            temp_adj = +1.5   # 오후는 약간 높게
+        elif 22 <= hour or hour <= 5:
+            temp_adj = -2.0   # 밤은 낮게 (수면)
+        else:
+            temp_adj = 0.0
+
+        return {
+            "temperature": base_temp + temp_adj,
+            "humidity":    50.0,
+            "pm25":        20.0,
+        }
 
     if store.model_temp is None:
-        r = _pattern(); r["method"] = "pattern_lookup"; return r
+        r = _pattern()
+        r["method"] = "pattern_lookup"
+        r["hour"]   = hour
+        r["is_weekend"] = is_weekend
+        return r
 
     dow = 5 if is_weekend else 2
     feats = {
@@ -212,6 +266,8 @@ def get_recommendation(hour, is_weekend, curr_temp, curr_humi, curr_pm25=0.0):
         "humidity":    round(ml["humidity"]   *wm + pat["humidity"]   *wp, 2),
         "pm25":        round(ml["pm25"]       *wm + pat["pm25"]       *wp, 2),
         "method":      f"blend(ml={wm}, pattern={wp})",
+        "hour":        hour,
+        "is_weekend":  is_weekend,
     }
 
 
