@@ -270,6 +270,40 @@ def get_outdoor_air():
 def outdoor_air():
     return get_outdoor_air() or {"error": "외부 미세먼지 조회 실패"}
 
+@app.get("/history", summary="기간별 데이터 조회")
+def get_history(range: str = "24h"):
+    """range: 24h, 7d, 30d"""
+    try:
+        interval_map = {
+            "24h": "24 hours",
+            "7d":  "7 days",
+            "30d": "30 days"
+        }
+        interval = interval_map.get(range, "24 hours")
+        trunc_map = {
+            "24h": "hour",
+            "7d":  "hour",
+            "30d": "day"
+        }
+        trunc = trunc_map.get(range, "hour")
+
+        with get_engine().connect() as conn:
+            rows = conn.execute(text(f"""
+                SELECT
+                    TO_CHAR(DATE_TRUNC('{trunc}', recorded_at), 'YYYY-MM-DD HH24:00') as hour_label,
+                    ROUND(AVG(temperature)::numeric, 1) as avg_temp,
+                    ROUND(AVG(humidity)::numeric, 1)    as avg_humi,
+                    ROUND(AVG(pm25)::numeric, 1)        as avg_pm25
+                FROM sensor_combined
+                WHERE recorded_at >= NOW() - INTERVAL '{interval}'
+                GROUP BY hour_label
+                ORDER BY hour_label ASC
+            """)).fetchall()
+        return [{"hour": r[0], "temperature": r[1], "humidity": r[2], "pm25": r[3]} for r in rows]
+    except Exception as e:
+        print(f"[history 오류] {e}")
+        return []
+
 @app.get("/status", summary="현재 센서값 + AI 권장값", tags=["ML 제어"])
 def get_status():
     s = get_latest_sensor(); now = datetime.now(); w = int(now.weekday() >= 5)
