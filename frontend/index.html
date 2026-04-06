@@ -635,11 +635,18 @@
 
     <!-- 시계열 차트 -->
     <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-        <div class="card-title" style="margin:0">시계열 차트 (최근 24시간)</div>
-        <div class="tabs" style="margin:0">
-          <div class="tab active" onclick="switchChart('temp')">온도·습도</div>
-          <div class="tab" onclick="switchChart('pm')">미세먼지</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+        <div class="card-title" style="margin:0">시계열 차트</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <div class="tabs" style="margin:0">
+            <div class="tab active" id="range-24h" onclick="switchRange('24h')">24시간</div>
+            <div class="tab" id="range-7d" onclick="switchRange('7d')">7일</div>
+            <div class="tab" id="range-30d" onclick="switchRange('30d')">30일</div>
+          </div>
+          <div class="tabs" style="margin:0">
+            <div class="tab active" onclick="switchChart('temp')">온도·습도</div>
+            <div class="tab" onclick="switchChart('pm')">미세먼지</div>
+          </div>
         </div>
       </div>
       <div class="chart-wrap">
@@ -1085,6 +1092,20 @@ async function loadOutdoorAir() {
 }
 
 loadOutdoorAir();
+// ── 날짜 범위 선택 ────────────────────────────────
+let currentRange = '24h';
+
+async function switchRange(range) {
+  currentRange = range;
+  document.querySelectorAll('[id^="range-"]').forEach(t => t.classList.remove('active'));
+  document.getElementById(`range-${range}`).classList.add('active');
+
+  try {
+    const res  = await fetch(`${API}/history?range=${range}`);
+    const data = await res.json();
+    updateCharts(data);
+  } catch(e) { console.error('history:', e); }
+}
 setInterval(loadOutdoorAir, 60000);
 // ── 챗봇 패널 리사이저 ──────────────────
 const resizer   = document.getElementById('resizer');
