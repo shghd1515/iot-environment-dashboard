@@ -689,7 +689,21 @@
         <canvas id="chart-pm"></canvas>
       </div>
     </div>
-
+    <!-- 시간대별 패턴 분석 -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div class="card-title" style="margin:0">시간대별 환경 패턴 (최근 30일)</div>
+        <div class="tabs" style="margin:0">
+          <div class="tab active" onclick="switchPattern('pm25')">미세먼지</div>
+          <div class="tab" onclick="switchPattern('temp')">온도</div>
+          <div class="tab" onclick="switchPattern('humi')">습도</div>
+        </div>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="chart-pattern"></canvas>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:8px" id="pattern-insight"></div>
+    </div>
     <!-- 이벤트 & 로그 탭 -->
     <div class="card">
       <div class="tabs">
@@ -1133,6 +1147,87 @@ async function loadOutdoorAir() {
 
 loadOutdoorAir();
 setInterval(loadOutdoorAir, 60000);
+// ── 시간대별 패턴 분석 ────────────────────────────────
+let patternChart = null;
+let patternData  = [];
+let currentPatternType = 'pm25';
+
+async function loadPattern() {
+  try {
+    const res  = await fetch(`${API}/pattern`);
+    patternData = await res.json();
+    renderPatternChart(currentPatternType);
+  } catch(e) { console.error('pattern:', e); }
+}
+
+function switchPattern(type) {
+  currentPatternType = type;
+  document.querySelectorAll('.card .tabs .tab').forEach(t => {
+    const isActive = 
+      (type === 'pm25' && t.textContent === '미세먼지') ||
+      (type === 'temp' && t.textContent === '온도') ||
+      (type === 'humi' && t.textContent === '습도');
+    if (t.closest('.card')?.querySelector('#chart-pattern')) {
+      t.classList.toggle('active', isActive);
+    }
+  });
+  renderPatternChart(type);
+}
+
+function renderPatternChart(type) {
+  if (!patternData.length) return;
+
+  const labels = patternData.map(d => `${d.hour}시`);
+  let dataset, label, color, insight;
+
+  if (type === 'pm25') {
+    const values = patternData.map(d => d.avg_pm25);
+    const maxHour = patternData.reduce((a, b) => a.avg_pm25 > b.avg_pm25 ? a : b);
+    const minHour = patternData.reduce((a, b) => a.avg_pm25 < b.avg_pm25 ? a : b);
+    dataset = [
+      { label: '평균 PM2.5', data: values, borderColor: '#854F0B', backgroundColor: 'rgba(133,79,11,0.15)', fill: true, tension: 0.4, pointRadius: 2 },
+      { label: '최고 PM2.5', data: patternData.map(d => d.max_pm25), borderColor: '#DC2626', backgroundColor: 'transparent', borderDash: [4,4], tension: 0.4, pointRadius: 0 },
+    ];
+    label = 'PM2.5 (μg/m³)';
+    color = '#854F0B';
+    insight = `📊 최고: ${maxHour.hour}시 (${maxHour.avg_pm25} μg/m³) | 최저: ${minHour.hour}시 (${minHour.avg_pm25} μg/m³)`;
+  } else if (type === 'temp') {
+    const values = patternData.map(d => d.avg_temp);
+    const maxHour = patternData.reduce((a, b) => a.avg_temp > b.avg_temp ? a : b);
+    const minHour = patternData.reduce((a, b) => a.avg_temp < b.avg_temp ? a : b);
+    dataset = [{ label: '평균 온도', data: values, borderColor: '#E85D24', backgroundColor: 'rgba(232,93,36,0.1)', fill: true, tension: 0.4, pointRadius: 2 }];
+    label = '온도 (°C)';
+    color = '#E85D24';
+    insight = `🌡️ 최고: ${maxHour.hour}시 (${maxHour.avg_temp}°C) | 최저: ${minHour.hour}시 (${minHour.avg_temp}°C)`;
+  } else {
+    const values = patternData.map(d => d.avg_humi);
+    const maxHour = patternData.reduce((a, b) => a.avg_humi > b.avg_humi ? a : b);
+    const minHour = patternData.reduce((a, b) => a.avg_humi < b.avg_humi ? a : b);
+    dataset = [{ label: '평균 습도', data: values, borderColor: '#2563EB', backgroundColor: 'rgba(37,99,235,0.1)', fill: true, tension: 0.4, pointRadius: 2 }];
+    label = '습도 (%)';
+    color = '#2563EB';
+    insight = `💧 최고: ${maxHour.hour}시 (${maxHour.avg_humi}%) | 최저: ${minHour.hour}시 (${minHour.avg_humi}%)`;
+  }
+
+  const ctx = document.getElementById('chart-pattern').getContext('2d');
+  if (patternChart) patternChart.destroy();
+  patternChart = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets: dataset },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { font: { family: 'DM Sans', size: 11 } } } },
+      scales: {
+        y: { ticks: { font: { family: 'DM Mono', size: 10 } }, grid: { color: '#E5E2DA' } },
+        x: { ticks: { font: { family: 'DM Mono', size: 10 } }, grid: { display: false } },
+      }
+    }
+  });
+  document.getElementById('pattern-insight').textContent = insight;
+}
+
+loadPattern();
+setInterval(loadPattern, 300000); // 5분마다 갱신
 
 // 초기 차트 로드
 switchRange('24h');
