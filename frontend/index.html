@@ -1408,14 +1408,32 @@ function toggleChat() {
   const btn = document.getElementById('collapse-btn');
   if (btn) btn.textContent = collapsed ? '펼치기 ▶' : '접기 ◀';
 
-  // 모바일에서 접기 시 메인 패널 전체 화면
   const isMobile = window.innerWidth <= 768;
   if (isMobile) {
     const mainPanel = document.querySelector('.main-panel');
-    mainPanel.style.height = collapsed ? '100vh' : '';
-    mainPanel.style.overflowY = collapsed ? 'auto' : '';
+    if (collapsed) {
+      mainPanel.style.height = '';
+      mainPanel.style.overflowY = '';
+      toggleBtn.style.display = 'flex';
+    } else {
+      toggleBtn.style.display = 'none';
+    }
   }
 }
+
+// 모바일에서 초기 상태 설정
+function initMobile() {
+  if (window.innerWidth <= 768) {
+    // 모바일: 챗봇 처음엔 열려있음
+    chatPanel.classList.remove('collapsed');
+    toggleBtn.style.display = 'none';
+    const btn = document.getElementById('collapse-btn');
+    if (btn) btn.textContent = '접기 ◀';
+  }
+}
+
+initMobile();
+window.addEventListener('resize', initMobile);
 
 toggleBtn.classList.add('visible');
 // Supabase 인증 확인
