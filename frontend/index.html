@@ -63,13 +63,36 @@
   }
 
   @media (max-width: 768px) {
+    .chat-panel {
+      position: fixed !important;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      width: 100% !important;
+      height: 60vh !important;
+      max-width: 100% !important;
+      border-left: none !important;
+      border-top: 1px solid var(--border);
+      z-index: 300;
+      transition: transform 0.3s ease;
+      transform: translateY(0);
+    }
     .chat-panel.collapsed {
-      height: 0 !important;
-      border-top: none;
+      transform: translateY(100%) !important;
+      width: 100% !important;
+      height: 60vh !important;
+    }
+    .toggle-chat-btn {
+      display: flex !important;
+      bottom: 16px;
+      right: 16px;
+      z-index: 400;
     }
     .main-panel {
-      flex: 1;
-      min-height: 100vh;
+      padding-bottom: 80px;
+    }
+    #collapse-btn {
+      display: none;
     }
   }
 
@@ -1424,11 +1447,13 @@ function toggleChat() {
 // 모바일에서 초기 상태 설정
 function initMobile() {
   if (window.innerWidth <= 768) {
-    // 모바일: 챗봇 처음엔 열려있음
+    // 모바일: 챗봇 처음엔 접혀있음 + 토글버튼 표시
+    chatPanel.classList.add('collapsed');
+    toggleBtn.style.display = 'flex';
+    toggleBtn.textContent = '✦';
+  } else {
     chatPanel.classList.remove('collapsed');
-    toggleBtn.style.display = 'none';
-    const btn = document.getElementById('collapse-btn');
-    if (btn) btn.textContent = '접기 ◀';
+    toggleBtn.classList.add('visible');
   }
 }
 
