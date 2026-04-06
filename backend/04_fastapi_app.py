@@ -307,9 +307,17 @@ def admin_page():
 
 # 외부 미세먼지 API
 AIR_API_KEY = "1046200dafe9143f9410798b3638c5353c7004949298293d317032ed3e415c85"
+_outdoor_cache = {"data": None, "time": 0}
 
 def get_outdoor_air():
-    """외부 미세먼지 조회 (서울 기준)"""
+    """외부 미세먼지 조회 (서울 기준) - 1시간 캐시"""
+    import time
+    now = time.time()
+
+    # 1시간 이내 캐시 사용
+    if _outdoor_cache["data"] and now - _outdoor_cache["time"] < 3600:
+        return _outdoor_cache["data"]
+
     try:
         url = "http://apis.data.go.kr/B552584/ArpltnInforInqireSvc/getCtprvnRltmMesureDnsty"
         params = {
@@ -321,25 +329,28 @@ def get_outdoor_air():
             "ver": "1.0"
         }
         r = requests.get(url, params=params, timeout=10)
-        print(f"[외부 미세먼지] 상태코드: {r.status_code}, 응답: {r.text[:200]}")
-        
+        print(f"[외부 미세먼지] 상태코드: {r.status_code}")
+
         if r.status_code != 200 or not r.text.strip():
-            return None
-            
+            return _outdoor_cache["data"]
+
         data = r.json()
         items = data["response"]["body"]["items"]
         if items:
             item = items[0]
-            return {
+            result = {
                 "station": item["stationName"],
-                "pm25": item["pm25Value"],
-                "pm10": item["pm10Value"],
-                "grade": item["pm25Grade"],
-                "time": item["dataTime"]
+                "pm25":    item["pm25Value"],
+                "pm10":    item["pm10Value"],
+                "grade":   item["pm25Grade"],
+                "time":    item["dataTime"]
             }
+            _outdoor_cache["data"] = result
+            _outdoor_cache["time"] = now
+            return result
     except Exception as e:
         print(f"[외부 미세먼지 오류] {e}")
-    return None
+    return _outdoor_cache["data"]
 
 @app.get("/outdoor-air", summary="외부 미세먼지")
 def outdoor_air():
