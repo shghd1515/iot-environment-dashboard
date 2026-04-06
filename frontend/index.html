@@ -7,6 +7,20 @@
 <title>IoT 환경 대시보드</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
+  /* ── 다크모드 ── */
+  body.dark {
+    --bg: #1A1916;
+    --surface: #242220;
+    --surface2: #2E2C29;
+    --border: #3A3835;
+    --text: #F7F6F3;
+    --text2: #A39F95;
+    --text3: #6B6860;
+    --accent-light: #1E3A5F;
+    --shadow: 0 1px 3px rgba(0,0,0,0.3);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.3);
+  }
+
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
 
   :root {
@@ -519,6 +533,16 @@
   <div class="header-right">
     <span><span class="status-dot"></span>실시간 수집 중</span>
     <span id="last-update" class="last-updated">-</span>
+    <button id="dark-mode-btn" onclick="toggleDarkMode()" style="
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 10px;
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--text2);
+      font-family: 'DM Sans', sans-serif;
+    ">🌙 다크</button>
   </div>
 </header>
 
@@ -1171,6 +1195,19 @@ if (createClient) {
   sb.auth.getSession().then(({ data }) => {
     if (!data.session) window.location.href = '/login';
   });
+}
+// ── 다크모드 ────────────────────────────────
+function toggleDarkMode() {
+  const isDark = document.body.classList.toggle('dark');
+  const btn = document.getElementById('dark-mode-btn');
+  btn.textContent = isDark ? '☀️ 라이트' : '🌙 다크';
+  localStorage.setItem('darkMode', isDark);
+}
+
+// 저장된 다크모드 설정 불러오기
+if (localStorage.getItem('darkMode') === 'true') {
+  document.body.classList.add('dark');
+  document.getElementById('dark-mode-btn').textContent = '☀️ 라이트';
 }
 </script>
 </body>
