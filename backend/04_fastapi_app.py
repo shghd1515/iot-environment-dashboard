@@ -375,6 +375,75 @@ def get_pattern():
         print(f"[패턴 오류] {e}")
         return []
 
+@app.get("/correlation", summary="온습도 상관관계 분석")
+def get_correlation():
+    """온도-습도-PM2.5 상관관계 분석"""
+    try:
+        with get_engine().connect() as conn:
+            rows = conn.execute(text("""
+                SELECT
+                    ROUND(temperature::numeric, 1) as temp,
+                    ROUND(humidity::numeric, 1)    as humi,
+                    ROUND(pm25::numeric, 1)        as pm25
+                FROM sensor_combined
+                WHERE pm25 IS NOT NULL
+                  AND temperature IS NOT NULL
+                  AND humidity IS NOT NULL
+                  AND recorded_at >= NOW() - INTERVAL '30 days'
+                ORDER BY recorded_at DESC
+                LIMIT 1000
+            """)).fetchall()
+
+        data = [{"temp": float(r[0]), "humi": float(r[1]), "pm25": float(r[2])} for r in rows]
+
+        if len(data) < 10:
+            return {"error": "데이터 부족"}
+
+        temps  = [d["temp"]  for d in data]
+        humis  = [d["humi"]  for d in data]
+        pm25s  = [d["pm25"]  for d in data]
+
+        def correlation(x, y):
+            n  = len(x)
+            mx = sum(x) / n
+            my = sum(y) / n
+            num   = sum((xi - mx) * (yi - my) for xi, yi in zip(x, y))
+            denom = (sum((xi - mx)**2 for xi in x) * sum((yi - my)**2 for yi in y)) ** 0.5
+            return round(num / denom, 3) if denom else 0
+
+        temp_humi_corr = correlation(temps, humis)
+        temp_pm25_corr = correlation(temps, pm25s)
+        humi_pm25_corr = correlation(humis, pm25s)
+
+        def interpret(corr):
+            if corr > 0.7:   return "강한 양의 상관관계"
+            elif corr > 0.3: return "약한 양의 상관관계"
+            elif corr < -0.7:return "강한 음의 상관관계"
+            elif corr < -0.3:return "약한 음의 상관관계"
+            else:             return "거의 상관없음"
+
+        return {
+            "temp_humi": {
+                "value": temp_humi_corr,
+                "interpret": interpret(temp_humi_corr),
+                "desc": "온도 ↑ → 습도 ↑" if temp_humi_corr > 0 else "온도 ↑ → 습도 ↓"
+            },
+            "temp_pm25": {
+                "value": temp_pm25_corr,
+                "interpret": interpret(temp_pm25_corr),
+                "desc": "온도 ↑ → PM2.5 ↑" if temp_pm25_corr > 0 else "온도 ↑ → PM2.5 ↓"
+            },
+            "humi_pm25": {
+                "value": humi_pm25_corr,
+                "interpret": interpret(humi_pm25_corr),
+                "desc": "습도 ↑ → PM2.5 ↑" if humi_pm25_corr > 0 else "습도 ↑ → PM2.5 ↓"
+            },
+            "sample_count": len(data)
+        }
+    except Exception as e:
+        print(f"[상관관계 오류] {e}")
+        return {"error": str(e)}
+
 @app.get("/history", summary="기간별 데이터 조회")
 def get_history(range: str = "24h"):
     """range: 24h, 7d, 30d"""
