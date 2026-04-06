@@ -10,6 +10,10 @@
   
   /* ── 모바일 반응형 ── */
   @media (max-width: 768px) {
+    #collapse-btn { display: none !important; }
+    #mobile-close-btn { display: block !important; }
+  }
+  @media (max-width: 768px) {
     header {
       padding: 0 16px;
     }
@@ -886,8 +890,19 @@
         color: var(--text2);
         font-family: 'DM Sans', sans-serif;
       " id="collapse-btn">접기 ◀</button>
+      <button onclick="toggleChat()" style="
+        margin-left: 8px;
+        background: none;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 4px 10px;
+        cursor: pointer;
+        font-size: 16px;
+        color: var(--text2);
+        font-family: 'DM Sans', sans-serif;
+        display: none;
+      " id="mobile-close-btn">✕</button>
     </div>
-
     <div class="chat-messages" id="chat-messages">
       <div class="msg ai">
         <div class="msg-avatar">✦</div>
