@@ -1,13 +1,24 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>IoT 환경 대시보드</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
-  
+  /* ── 드래그앤드롭 ── */
+  .drag-handle {
+    cursor: grab;
+    color: var(--text3);
+    font-size: 16px;
+    padding: 0 6px;
+    user-select: none;
+  }
+  .drag-handle:active { cursor: grabbing; }
+  .card.sortable-ghost { opacity: 0.4; }
+  .card.sortable-chosen { box-shadow: var(--shadow-md); }
   /* ── 모바일 반응형 ── */
   @media (max-width: 768px) {
     #collapse-btn { display: none !important; }
@@ -691,7 +702,7 @@
     </div>
     <!-- 실내 vs 실외 비교 -->
     <div class="card">
-      <div class="card-title">실내 vs 실외 미세먼지 비교</div>
+      <div class="card-title"><span class="drag-handle">⠿</span> 실내 vs 실외 미세먼지 비교</div>
       <div class="compare-grid">
         <div class="compare-item">
           <div class="compare-item-label">🏠 실내 PM2.5</div>
@@ -724,7 +735,7 @@
     </div>
     <!-- AI 비교 -->
     <div class="card">
-      <div class="card-title">AI 권장값 vs 현재값</div>
+      <div class="card-title"><span class="drag-handle">⠿</span> AI 권장값 vs 현재값</div>
       <div class="compare-grid">
         <div class="compare-item">
           <div class="compare-item-label">온도</div>
@@ -762,7 +773,7 @@
     <!-- 시계열 차트 -->
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
-        <div class="card-title" style="margin:0">시계열 차트</div>
+        <div class="card-title" style="margin:0"><span class="drag-handle">⠿</span> 시계열 차트</div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <div class="tabs" style="margin:0">
             <div class="tab active" id="range-24h" onclick="switchRange('24h')">24시간</div>
@@ -785,7 +796,7 @@
     <!-- 시간대별 패턴 분석 -->
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-        <div class="card-title" style="margin:0">시간대별 환경 패턴 (최근 30일)</div>
+        <div class="card-title" style="margin:0"><span class="drag-handle">⠿</span> 시간대별 환경 패턴 (최근 30일)</div>
         <div class="tabs" style="margin:0">
           <div class="tab active" onclick="switchPattern('pm25')">미세먼지</div>
           <div class="tab" onclick="switchPattern('temp')">온도</div>
@@ -799,7 +810,7 @@
     </div>
     <!-- 온습도 상관관계 분석 -->
     <div class="card">
-      <div class="card-title">환경 상관관계 분석 (최근 30일)</div>
+      <div class="card-title"><span class="drag-handle">⠿</span> 환경 상관관계 분석 (최근 30일)</div>
       <div class="compare-grid">
         <div class="compare-item">
           <div class="compare-item-label">🌡️ 온도 vs 💧 습도</div>
@@ -824,6 +835,7 @@
     </div>
     <!-- 이벤트 & 로그 탭 -->
     <div class="card">
+      <div class="card-title"><span class="drag-handle">⠿</span> 이벤트 & 로그 탭</div>
       <div class="tabs">
         <div class="tab active" onclick="switchTab('events')">이벤트 기록</div>
         <div class="tab" onclick="switchTab('logs')">AI 제어 로그</div>
@@ -1494,6 +1506,20 @@ if (localStorage.getItem('darkMode') === 'true') {
   document.body.classList.add('dark');
   document.getElementById('dark-mode-btn').textContent = '☀️ 라이트';
 }
+// ── 드래그앤드롭 위젯 순서 변경 ────────────────────────────────
+const mainPanelEl = document.querySelector('.main-panel');
+Sortable.create(mainPanelEl, {
+  handle: '.drag-handle',
+  animation: 150,
+  ghostClass: 'sortable-ghost',
+  chosenClass: 'sortable-chosen',
+  onEnd: function() {
+    // 카드 순서 저장
+    const cards = [...mainPanelEl.children];
+    const order = cards.map(el => el.querySelector('.drag-handle')?.nextSibling?.textContent?.trim() || '');
+    localStorage.setItem('widgetOrder', JSON.stringify(order));
+  }
+});
 </script>
 </body>
 </html>
