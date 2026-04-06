@@ -12,6 +12,7 @@ Gemini 챗봇 + 자동제어 + 환기 알람 통합
 
 import os, json, math, joblib
 import pandas as pd
+import requests
 from datetime import datetime
 from contextlib import asynccontextmanager
 
@@ -234,6 +235,40 @@ def admin_page():
     if os.path.exists(path):
         return FileResponse(path)
     return {"message": "admin.html 없음"}
+
+# 외부 미세먼지 API
+AIR_API_KEY = "1046200dafe9143f9410798b3638c5353c7004949298293d317032ed3e415c85"
+
+def get_outdoor_air():
+    """외부 미세먼지 조회 (서울 기준)"""
+    try:
+        url = "http://apis.data.go.kr/B552584/ArpltnInforInqireSvc/getCtprvnRltmMesureDnsty"
+        params = {
+            "serviceKey": AIR_API_KEY,
+            "returnType": "json",
+            "numOfRows": 1,
+            "pageNo": 1,
+            "sidoName": "서울",
+            "ver": "1.0"
+        }
+        r = requests.get(url, params=params, timeout=5)
+        items = r.json()["response"]["body"]["items"]
+        if items:
+            item = items[0]
+            return {
+                "station": item["stationName"],
+                "pm25": item["pm25Value"],
+                "pm10": item["pm10Value"],
+                "grade": item["pm25Grade"],
+                "time": item["dataTime"]
+            }
+    except Exception as e:
+        print(f"[외부 미세먼지 오류] {e}")
+    return None
+
+@app.get("/outdoor-air", summary="외부 미세먼지")
+def outdoor_air():
+    return get_outdoor_air() or {"error": "외부 미세먼지 조회 실패"}
 
 @app.get("/status", summary="현재 센서값 + AI 권장값", tags=["ML 제어"])
 def get_status():
