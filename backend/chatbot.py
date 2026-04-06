@@ -32,16 +32,29 @@ else:
     gemini_client = None
 
 # ── DB 연결 ───────────────────────────────────────────────────────────────────
+# 전역 엔진 (연결 풀 재사용)
+_engine = None
+
 def get_engine():
-    supabase_url = os.getenv("SUPABASE_DB_URL")
-    if supabase_url:
-        return create_engine(supabase_url, pool_pre_ping=True)
-    url = (
-        f"mysql+pymysql://{os.getenv('DB_USER','root01')}:{os.getenv('DB_PASSWORD','00000')}"
-        f"@{os.getenv('DB_HOST','192.168.101.2')}:{os.getenv('DB_PORT','3307')}"
-        f"/{os.getenv('DB_NAME','sensor_db')}?charset=utf8mb4"
-    )
-    return create_engine(url, pool_pre_ping=True)
+    global _engine
+    if _engine is None:
+        supabase_url = os.getenv("SUPABASE_DB_URL")
+        if supabase_url:
+            _engine = create_engine(
+                supabase_url,
+                pool_pre_ping=True,
+                pool_size=2,
+                max_overflow=3,
+                pool_recycle=300,
+            )
+        else:
+            url = (
+                f"mysql+pymysql://{os.getenv('DB_USER','root01')}:{os.getenv('DB_PASSWORD','00000')}"
+                f"@{os.getenv('DB_HOST','192.168.101.2')}:{os.getenv('DB_PORT','3307')}"
+                f"/{os.getenv('DB_NAME','sensor_db')}?charset=utf8mb4"
+            )
+            _engine = create_engine(url, pool_pre_ping=True)
+    return _engine
 
 engine = get_engine()
 
