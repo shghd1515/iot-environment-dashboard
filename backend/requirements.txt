@@ -7,6 +7,6 @@ pandas
 python-dotenv
 joblib
 scikit-learn
-google-genai
+google-genai>=1.0.0
 apscheduler
 httpx
