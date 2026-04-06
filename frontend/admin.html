@@ -194,6 +194,27 @@
   </div>
 </div>
 
+<!-- 알림 히스토리 -->
+  <div class="card">
+    <div class="card-title">알림 히스토리 (최근 50개)</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>시각</th>
+            <th>유형</th>
+            <th>측정값</th>
+            <th>임계값</th>
+            <th>메시지</th>
+          </tr>
+        </thead>
+        <tbody id="alerts-tbody">
+          <tr><td colspan="5" class="empty">로딩 중...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
 <script>
 const SUPABASE_URL  = 'https://qazlmymqkzlgqrptjjxk.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhemxteW1xa3psZ3FycHRqanhrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjUyNjIsImV4cCI6MjA5MDYwMTI2Mn0.RcjTa9rWImbadoBH56bg3G1Zopwixz4exVCqh1u6D00';
@@ -242,7 +263,43 @@ async function recordEvent() {
 }
 
 async function loadAll() {
-  await Promise.all([loadStats(), loadData(), loadEvents(), loadUserLogs(), loadControlLogs()]);
+  await Promise.all([
+    loadStats(),
+    loadData(),
+    loadEvents(),
+    loadUserLogs(),
+    loadControlLogs(),
+    loadAlerts(),
+  ]);
+}
+
+async function loadAlerts() {
+  const tbody = document.getElementById('alerts-tbody');
+  try {
+    const res  = await fetch(`${API}/alerts`);
+    const logs = await res.json();
+    if (!logs?.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty">알림 없음</td></tr>';
+      return;
+    }
+    const typeIcon = {
+      '미세먼지': '🚨',
+      '온도높음':  '🌡️',
+      '온도낮음':  '🥶',
+      '습도높음':  '💧',
+      '습도낮음':  '🏜️',
+    };
+    tbody.innerHTML = logs.map(r => `
+      <tr>
+        <td>${(r.created_at||'').slice(0,16)}</td>
+        <td>${typeIcon[r.alert_type] || ''} ${r.alert_type}</td>
+        <td>${r.value ?? '-'}</td>
+        <td>${r.threshold ?? '-'}</td>
+        <td>${r.message || '-'}</td>
+      </tr>`).join('');
+  } catch(e) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">오류 발생</td></tr>';
+  }
 }
 
 async function loadStats() {
