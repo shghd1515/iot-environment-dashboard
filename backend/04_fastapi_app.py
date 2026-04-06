@@ -320,8 +320,14 @@ def get_outdoor_air():
             "sidoName": "서울",
             "ver": "1.0"
         }
-        r = requests.get(url, params=params, timeout=5)
-        items = r.json()["response"]["body"]["items"]
+        r = requests.get(url, params=params, timeout=10)
+        print(f"[외부 미세먼지] 상태코드: {r.status_code}, 응답: {r.text[:200]}")
+        
+        if r.status_code != 200 or not r.text.strip():
+            return None
+            
+        data = r.json()
+        items = data["response"]["body"]["items"]
         if items:
             item = items[0]
             return {
