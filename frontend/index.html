@@ -1108,8 +1108,10 @@ async function loadOutdoorAir() {
 }
 
 loadOutdoorAir();
-// ── 날짜 범위 선택 ────────────────────────────────
-let currentRange = '24h';
+setInterval(loadOutdoorAir, 60000);
+
+// 초기 차트 로드
+switchRange('24h');
 
 async function switchRange(range) {
   currentRange = range;
