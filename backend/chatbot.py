@@ -277,7 +277,7 @@ def chat(req: ChatRequest):
     else:
         try:
             response = gemini_client.models.generate_content(
-                model="gemini-1.5-flash",
+                model="gemini-2.5-flash-preview-04-17",
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     temperature=0.4,
