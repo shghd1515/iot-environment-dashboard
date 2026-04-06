@@ -375,6 +375,30 @@ def get_pattern():
         print(f"[패턴 오류] {e}")
         return []
 
+@app.get("/alerts", summary="알림 히스토리")
+def get_alerts():
+    try:
+        with get_engine().connect() as conn:
+            rows = conn.execute(text("""
+                SELECT alert_type, message, value, threshold, created_at
+                FROM alert_logs
+                ORDER BY created_at DESC
+                LIMIT 50
+            """)).fetchall()
+        return [
+            {
+                "alert_type": r[0],
+                "message":    r[1],
+                "value":      r[2],
+                "threshold":  r[3],
+                "created_at": str(r[4])
+            }
+            for r in rows
+        ]
+    except Exception as e:
+        print(f"[알림 히스토리 오류] {e}")
+        return []
+
 @app.get("/correlation", summary="온습도 상관관계 분석")
 def get_correlation():
     """온도-습도-PM2.5 상관관계 분석"""

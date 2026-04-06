@@ -60,6 +60,18 @@ def send_telegram(message: str, force: bool = False):
 # 이전 값 저장용
 prev_values = {"temp": None, "humi": None, "pm25": None}
 
+def log_alert(alert_type: str, message: str, value: float = 0, threshold: float = 0):
+    """알림 히스토리 DB 기록"""
+    try:
+        with engine.connect() as conn:
+            conn.execute(text(
+                "INSERT INTO alert_logs (alert_type, message, value, threshold) "
+                "VALUES (:t, :m, :v, :th)"
+            ), {"t": alert_type, "m": message, "v": value, "th": threshold})
+            conn.commit()
+    except Exception as e:
+        print(f"[알림 로그 오류] {e}")
+
 def detect_anomaly(curr_temp, curr_humi, curr_pm25):
     """이상치 감지 및 알림"""
     global prev_values
@@ -320,30 +332,39 @@ def auto_control_job():
                 f"현재 온도: {curr_temp}°C / 습도: {curr_humi}%\n"
                 f"대시보드: https://iot-environment-dashboard.onrender.com"
             )
+            log_alert("미세먼지", f"PM2.5 {curr_pm25} μg/m³ 경보", curr_pm25, 35)
+
         if curr_temp >= 28:
             send_telegram(
                 f"🌡️ 온도 높음 경보!\n"
                 f"현재 온도: {curr_temp}°C\n"
                 f"대시보드: https://iot-environment-dashboard.onrender.com"
             )
+            log_alert("온도높음", f"온도 {curr_temp}°C 경보", curr_temp, 28)
+
         if curr_temp <= 15:
             send_telegram(
                 f"🥶 온도 낮음 경보!\n"
                 f"현재 온도: {curr_temp}°C\n"
                 f"대시보드: https://iot-environment-dashboard.onrender.com"
             )
+            log_alert("온도낮음", f"온도 {curr_temp}°C 경보", curr_temp, 15)
+
         if curr_humi >= 70:
             send_telegram(
                 f"💧 습도 높음 경보!\n"
                 f"현재 습도: {curr_humi}%\n"
                 f"대시보드: https://iot-environment-dashboard.onrender.com"
             )
+            log_alert("습도높음", f"습도 {curr_humi}% 경보", curr_humi, 70)
+
         if curr_humi <= 30:
             send_telegram(
                 f"🏜️ 습도 낮음 경보!\n"
                 f"현재 습도: {curr_humi}%\n"
                 f"대시보드: https://iot-environment-dashboard.onrender.com"
             )
+            log_alert("습도낮음", f"습도 {curr_humi}% 경보", curr_humi, 30)
 
         log_control({
             "hour":       now.hour,
