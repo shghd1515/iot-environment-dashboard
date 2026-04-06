@@ -287,6 +287,7 @@ def chat(req: ChatRequest):
             answer = response.text.strip()
         except Exception as e:
             err = str(e)
+            print(f"[Gemini 오류] {err}")
             if "429" in err or "RESOURCE_EXHAUSTED" in err or "quota" in err.lower():
                 answer = "현재 AI 서비스 이용량이 초과됐습니다. 잠시 후 다시 시도해주세요. (보통 1분 후 자동 복구됩니다)"
             elif "404" in err or "not found" in err.lower():
