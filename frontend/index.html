@@ -553,6 +553,15 @@
           <span class="metric-unit">μg/m³</span>
         </div>
         <div id="pm25-badge"><span class="pm-badge">-</span></div>
+        <!-- 미세먼지 게이지 -->
+        <div style="margin-top:10px">
+          <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-bottom:3px">
+            <span>좋음</span><span>보통</span><span>나쁨</span><span>매우나쁨</span>
+          </div>
+          <div style="height:6px;border-radius:3px;background:linear-gradient(to right,#16A34A,#D97706,#DC2626,#7C3AED);position:relative">
+            <div id="pm25-gauge-marker" style="position:absolute;top:-3px;width:12px;height:12px;background:white;border:2px solid #1A1916;border-radius:50%;transform:translateX(-50%);transition:left 0.5s;left:0%"></div>
+          </div>
+        </div>
       </div>
       <div class="metric-card pm10">
         <div class="metric-label">PM10</div>
@@ -835,6 +844,13 @@ function updateMetrics(s, grade) {
   document.getElementById('val-temp').textContent = s.temperature ?? '--';
   document.getElementById('val-humi').textContent = s.humidity ?? '--';
   document.getElementById('val-pm25').textContent = s.pm25 ?? '--';
+  // 미세먼지 게이지 마커 위치 업데이트
+  const marker = document.getElementById('pm25-gauge-marker');
+  if (marker) {
+    // 0~75+ 범위를 0~100%로 변환
+    const pct = Math.min(100, (pm25 / 75) * 100);
+    marker.style.left = pct + '%';
+  }
   document.getElementById('val-pm10').textContent = s.pm10 ?? '--';
 
   const pm25 = s.pm25 || 0;
