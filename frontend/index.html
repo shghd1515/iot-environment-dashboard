@@ -183,6 +183,7 @@
     grid-template-columns: repeat(4, 1fr);
     gap: 12px;
   }
+  
   .metric-card {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -562,7 +563,39 @@
         <div class="metric-diff" style="color:var(--text3)">미세먼지</div>
       </div>
     </div>
-
+    <!-- 실내 vs 실외 비교 -->
+    <div class="card">
+      <div class="card-title">실내 vs 실외 미세먼지 비교</div>
+      <div class="compare-grid">
+        <div class="compare-item">
+          <div class="compare-item-label">🏠 실내 PM2.5</div>
+          <div class="compare-row">
+            <span class="compare-current" id="indoor-pm25">--</span>
+            <span class="compare-ai" id="indoor-grade">-</span>
+          </div>
+          <div class="compare-bar-wrap">
+            <div class="compare-bar" id="bar-indoor" style="width:50%;background:var(--pm25)"></div>
+          </div>
+        </div>
+        <div class="compare-item">
+          <div class="compare-item-label">🌍 실외 PM2.5</div>
+          <div class="compare-row">
+            <span class="compare-current" id="outdoor-pm25">--</span>
+            <span class="compare-ai" id="outdoor-grade">-</span>
+          </div>
+          <div class="compare-bar-wrap">
+            <div class="compare-bar" id="bar-outdoor" style="width:50%;background:var(--pm25)"></div>
+          </div>
+        </div>
+        <div class="compare-item">
+          <div class="compare-item-label">💡 환기 추천</div>
+          <div id="ventilation-advice" style="font-size:13px;color:var(--text);margin-top:8px;line-height:1.5">
+            데이터 로딩 중...
+          </div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:8px" id="outdoor-time">측정소: - | 측정시각: -</div>
+    </div>
     <!-- AI 비교 -->
     <div class="card">
       <div class="card-title">AI 권장값 vs 현재값</div>
@@ -1017,6 +1050,42 @@ function handleKey(e) {
 // ── 초기화 + 자동 갱신 ───────────────────────────────────────────────────────
 loadAll();
 setInterval(loadAll, 10000);  // 10초마다 갱신
+// ── 실외 미세먼지 ────────────────────────────────
+async function loadOutdoorAir() {
+  try {
+    const res  = await fetch(`${API}/outdoor-air`);
+    const data = await res.json();
+    if (data.error) return;
+
+    const outdoorPm25 = parseInt(data.pm25) || 0;
+    const indoorPm25  = parseFloat(document.getElementById('val-pm25').textContent) || 0;
+
+    const gradeMap = { "1": "좋음", "2": "보통", "3": "나쁨", "4": "매우나쁨" };
+    const grade = gradeMap[data.grade] || "-";
+
+    document.getElementById('outdoor-pm25').textContent = `${outdoorPm25} μg/m³`;
+    document.getElementById('outdoor-grade').textContent = grade;
+    document.getElementById('indoor-pm25').textContent  = `${indoorPm25} μg/m³`;
+    document.getElementById('bar-outdoor').style.width  = Math.min(100, (outdoorPm25 / 75) * 100) + '%';
+    document.getElementById('bar-indoor').style.width   = Math.min(100, (indoorPm25 / 75) * 100) + '%';
+    document.getElementById('outdoor-time').textContent = `측정소: ${data.station} | 측정시각: ${data.time}`;
+
+    let advice = '';
+    if (outdoorPm25 < indoorPm25) {
+      advice = `✅ 환기 권장! 실외(${outdoorPm25})가 실내(${indoorPm25})보다 낮습니다.`;
+    } else if (outdoorPm25 > indoorPm25) {
+      advice = `❌ 환기 비권장! 실외(${outdoorPm25})가 실내(${indoorPm25})보다 높습니다.`;
+    } else {
+      advice = `➖ 실내외 미세먼지가 비슷합니다. (${outdoorPm25} μg/m³)`;
+    }
+    document.getElementById('ventilation-advice').textContent = advice;
+    document.getElementById('indoor-grade').textContent = document.querySelector('#pm25-badge .pm-badge')?.textContent || '-';
+
+  } catch(e) { console.error('outdoor-air:', e); }
+}
+
+loadOutdoorAir();
+setInterval(loadOutdoorAir, 60000);
 // ── 챗봇 패널 리사이저 ──────────────────
 const resizer   = document.getElementById('resizer');
 const chatPanel = document.getElementById('chat-panel');
