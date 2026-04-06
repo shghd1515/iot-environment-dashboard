@@ -704,6 +704,31 @@
       </div>
       <div style="font-size:11px;color:var(--text3);margin-top:8px" id="pattern-insight"></div>
     </div>
+    <!-- 온습도 상관관계 분석 -->
+    <div class="card">
+      <div class="card-title">환경 상관관계 분석 (최근 30일)</div>
+      <div class="compare-grid">
+        <div class="compare-item">
+          <div class="compare-item-label">🌡️ 온도 vs 💧 습도</div>
+          <div style="font-size:24px;font-weight:300;font-family:'DM Mono',monospace;margin:8px 0" id="corr-temp-humi">-</div>
+          <div style="font-size:12px;color:var(--text2)" id="corr-temp-humi-desc">-</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:4px" id="corr-temp-humi-interpret">-</div>
+        </div>
+        <div class="compare-item">
+          <div class="compare-item-label">🌡️ 온도 vs 🌫️ PM2.5</div>
+          <div style="font-size:24px;font-weight:300;font-family:'DM Mono',monospace;margin:8px 0" id="corr-temp-pm25">-</div>
+          <div style="font-size:12px;color:var(--text2)" id="corr-temp-pm25-desc">-</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:4px" id="corr-temp-pm25-interpret">-</div>
+        </div>
+        <div class="compare-item">
+          <div class="compare-item-label">💧 습도 vs 🌫️ PM2.5</div>
+          <div style="font-size:24px;font-weight:300;font-family:'DM Mono',monospace;margin:8px 0" id="corr-humi-pm25">-</div>
+          <div style="font-size:12px;color:var(--text2)" id="corr-humi-pm25-desc">-</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:4px" id="corr-humi-pm25-interpret">-</div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:12px" id="corr-sample">-</div>
+    </div>
     <!-- 이벤트 & 로그 탭 -->
     <div class="card">
       <div class="tabs">
@@ -1228,6 +1253,44 @@ function renderPatternChart(type) {
 
 loadPattern();
 setInterval(loadPattern, 300000); // 5분마다 갱신
+
+// ── 상관관계 분석 ────────────────────────────────
+async function loadCorrelation() {
+  try {
+    const res  = await fetch(`${API}/correlation`);
+    const data = await res.json();
+    if (data.error) return;
+
+    function colorByCorr(val) {
+      if (val > 0.7)       return 'var(--bad)';
+      else if (val > 0.3)  return 'var(--moderate)';
+      else if (val < -0.7) return '#7C3AED';
+      else if (val < -0.3) return 'var(--humi)';
+      else                 return 'var(--text3)';
+    }
+
+    const fields = [
+      { key: 'temp_humi', id: 'corr-temp-humi' },
+      { key: 'temp_pm25', id: 'corr-temp-pm25' },
+      { key: 'humi_pm25', id: 'corr-humi-pm25' },
+    ];
+
+    fields.forEach(({ key, id }) => {
+      const d = data[key];
+      const el = document.getElementById(id);
+      el.textContent = d.value;
+      el.style.color = colorByCorr(d.value);
+      document.getElementById(`${id}-desc`).textContent = d.desc;
+      document.getElementById(`${id}-interpret`).textContent = d.interpret;
+    });
+
+    document.getElementById('corr-sample').textContent =
+      `📊 분석 샘플: ${data.sample_count.toLocaleString()}개`;
+  } catch(e) { console.error('correlation:', e); }
+}
+
+loadCorrelation();
+setInterval(loadCorrelation, 300000);
 
 // 초기 차트 로드
 switchRange('24h');
