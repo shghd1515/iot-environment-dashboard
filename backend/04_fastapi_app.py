@@ -339,6 +339,42 @@ def get_outdoor_air():
 def outdoor_air():
     return get_outdoor_air() or {"error": "외부 미세먼지 조회 실패"}
 
+@app.get("/pattern", summary="시간대별 환경 패턴 분석")
+def get_pattern():
+    """최근 30일 데이터 기반 시간대별 평균값 분석"""
+    try:
+        with get_engine().connect() as conn:
+            rows = conn.execute(text("""
+                SELECT
+                    EXTRACT(HOUR FROM recorded_at)::int as hour,
+                    ROUND(AVG(temperature)::numeric, 1) as avg_temp,
+                    ROUND(AVG(humidity)::numeric, 1)    as avg_humi,
+                    ROUND(AVG(pm25)::numeric, 1)        as avg_pm25,
+                    ROUND(MAX(pm25)::numeric, 1)        as max_pm25,
+                    ROUND(MIN(pm25)::numeric, 1)        as min_pm25,
+                    COUNT(*)                            as count
+                FROM sensor_combined
+                WHERE pm25 IS NOT NULL
+                  AND recorded_at >= NOW() - INTERVAL '30 days'
+                GROUP BY hour
+                ORDER BY hour ASC
+            """)).fetchall()
+        return [
+            {
+                "hour": r[0],
+                "avg_temp": r[1],
+                "avg_humi": r[2],
+                "avg_pm25": r[3],
+                "max_pm25": r[4],
+                "min_pm25": r[5],
+                "count": r[6]
+            }
+            for r in rows
+        ]
+    except Exception as e:
+        print(f"[패턴 오류] {e}")
+        return []
+
 @app.get("/history", summary="기간별 데이터 조회")
 def get_history(range: str = "24h"):
     """range: 24h, 7d, 30d"""
