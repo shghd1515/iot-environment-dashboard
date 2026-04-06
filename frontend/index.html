@@ -1426,21 +1426,16 @@ document.addEventListener('mouseup', () => {
 
 function toggleChat() {
   const collapsed = chatPanel.classList.toggle('collapsed');
-  resizer.style.display = collapsed ? 'none' : 'block';
-  toggleBtn.textContent = collapsed ? '✦' : '✕';
   const btn = document.getElementById('collapse-btn');
-  if (btn) btn.textContent = collapsed ? '펼치기 ▶' : '접기 ◀';
-
   const isMobile = window.innerWidth <= 768;
+
   if (isMobile) {
-    const mainPanel = document.querySelector('.main-panel');
-    if (collapsed) {
-      mainPanel.style.height = '';
-      mainPanel.style.overflowY = '';
-      toggleBtn.style.display = 'flex';
-    } else {
-      toggleBtn.style.display = 'none';
-    }
+    toggleBtn.textContent = collapsed ? '✦' : '✕';
+    toggleBtn.style.display = 'flex';
+  } else {
+    resizer.style.display = collapsed ? 'none' : 'block';
+    toggleBtn.textContent = collapsed ? '✦' : '✕';
+    if (btn) btn.textContent = collapsed ? '펼치기 ▶' : '접기 ◀';
   }
 }
 
