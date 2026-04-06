@@ -31,15 +31,29 @@ CHECK_INTERVAL_MIN = 1
 TELEGRAM_TOKEN   = "8741549548:AAEb0QB0F1CRoLkIp3waEEfODcpsUqyu_OE"
 TELEGRAM_CHAT_ID = "8717882823"
 
-def send_telegram(message: str):
-    """텔레그램 알림 전송"""
+# 수면 모드 설정 (취침 22시 ~ 기상 6시)
+SLEEP_START = 22
+SLEEP_END   = 6
+
+def is_sleep_mode() -> bool:
+    """현재 수면 시간대인지 확인"""
+    hour = datetime.now().hour
+    if SLEEP_START > SLEEP_END:  # 자정 넘기는 경우
+        return hour >= SLEEP_START or hour < SLEEP_END
+    return SLEEP_START <= hour < SLEEP_END
+
+def send_telegram(message: str, force: bool = False):
+    """텔레그램 알림 전송 (수면 모드 시 무음)"""
+    if is_sleep_mode() and not force:
+        print(f"[수면 모드] 알림 무음 처리: {message[:30]}...")
+        return
     try:
         requests.post(
             f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
             data={"chat_id": TELEGRAM_CHAT_ID, "text": message},
             timeout=5
         )
-        print(f"[텔레그램] 알림 전송: {message}")
+        print(f"[텔레그램] 알림 전송: {message[:30]}...")
     except Exception as e:
         print(f"[텔레그램 오류] {e}")
 
