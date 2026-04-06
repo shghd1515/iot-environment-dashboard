@@ -844,13 +844,6 @@ function updateMetrics(s, grade) {
   document.getElementById('val-temp').textContent = s.temperature ?? '--';
   document.getElementById('val-humi').textContent = s.humidity ?? '--';
   document.getElementById('val-pm25').textContent = s.pm25 ?? '--';
-  // 미세먼지 게이지 마커 위치 업데이트
-  const marker = document.getElementById('pm25-gauge-marker');
-  if (marker) {
-    // 0~75+ 범위를 0~100%로 변환
-    const pct = Math.min(100, (pm25 / 75) * 100);
-    marker.style.left = pct + '%';
-  }
   document.getElementById('val-pm10').textContent = s.pm10 ?? '--';
 
   const pm25 = s.pm25 || 0;
@@ -863,6 +856,13 @@ function updateMetrics(s, grade) {
   const [cls, label] = gradeMap[grade] || ['moderate', '● 보통'];
   document.getElementById('pm25-badge').innerHTML =
     `<span class="pm-badge ${cls}">${label}</span>`;
+
+  // 미세먼지 게이지 마커 위치 업데이트
+  const marker = document.getElementById('pm25-gauge-marker');
+  if (marker) {
+    const pct = Math.min(100, (pm25 / 75) * 100);
+    marker.style.left = pct + '%';
+  }
 }
 
 function updateComparison(cur, rec) {
