@@ -118,11 +118,56 @@
     --surface2: #2E2C29;
     --border: #3A3835;
     --text: #F7F6F3;
-    --text2: #A39F95;
-    --text3: #6B6860;
+    --text2: #C8C4BC;
+    --text3: #8A8680;
+    --accent: #3B82F6;
     --accent-light: #1E3A5F;
-    --shadow: 0 1px 3px rgba(0,0,0,0.3);
-    --shadow-md: 0 4px 12px rgba(0,0,0,0.3);
+    --good: #22C55E;
+    --good-bg: #14532D;
+    --moderate: #F59E0B;
+    --moderate-bg: #451A03;
+    --bad: #EF4444;
+    --bad-bg: #450A0A;
+    --very-bad: #A78BFA;
+    --very-bad-bg: #2E1065;
+    --shadow: 0 1px 3px rgba(0,0,0,0.4);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+  }
+
+  body.dark .metric-value { color: var(--text); }
+  body.dark .metric-unit  { color: var(--text3); }
+  body.dark .metric-diff  { color: var(--text2); }
+  body.dark .compare-item { background: var(--surface2); }
+  body.dark .compare-bar-wrap { background: #3A3835; }
+  body.dark .tab { color: var(--text3); }
+  body.dark .tab.active { background: var(--accent-light); color: #93C5FD; }
+  body.dark .tab:hover:not(.active) { background: var(--surface2); color: var(--text); }
+  body.dark table td { color: var(--text2); }
+  body.dark table th { color: var(--text3); }
+  body.dark .chat-input { background: var(--surface2); color: var(--text); border-color: var(--border); }
+  body.dark .chat-input:focus { background: var(--surface); border-color: var(--accent); }
+  body.dark .msg.ai .msg-bubble { background: var(--surface2); color: var(--text); }
+  body.dark .suggestion { background: var(--surface2); color: var(--text2); border-color: var(--border); }
+  body.dark .suggestion:hover { background: var(--accent-light); color: #93C5FD; border-color: var(--accent); }
+  body.dark .compare-current { color: var(--text); }
+  body.dark .card-title { color: var(--text3); }
+  body.dark .drag-handle { color: var(--text3); }
+  body.dark #dark-mode-btn { color: var(--text2); border-color: var(--border); }
+  body.dark .pm-badge.good     { background: var(--good-bg);     color: #4ADE80; }
+  body.dark .pm-badge.moderate { background: var(--moderate-bg); color: #FCD34D; }
+  body.dark .pm-badge.bad      { background: var(--bad-bg);      color: #FCA5A5; }
+  body.dark .pm-badge.very-bad { background: var(--very-bad-bg); color: #C4B5FD; }
+  body.dark .event-badge { background: var(--accent-light); color: #93C5FD; }
+  body.dark .typing span { background: var(--text3); }
+  body.dark .chat-header { border-color: var(--border); }
+  body.dark .chat-suggestions { border-color: var(--border); }
+  body.dark .chat-input-wrap { border-color: var(--border); }
+  body.dark #collapse-btn { color: var(--text2); border-color: var(--border); }
+  body.dark #mobile-close-btn { color: var(--text2); border-color: var(--border); }
+
+  /* 모바일 다크모드 버튼 */
+  @media (max-width: 768px) {
+    #dark-mode-btn { display: flex !important; font-size: 11px; padding: 3px 8px; }
   }
 
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
