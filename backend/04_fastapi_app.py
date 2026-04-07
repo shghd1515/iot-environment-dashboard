@@ -485,6 +485,66 @@ def get_correlation():
         print(f"[상관관계 오류] {e}")
         return {"error": str(e)}
 
+@app.get("/forecast", summary="미래 환경 예측")
+def get_forecast(hours: int = 3):
+    """Prophet 기반 시계열 예측 (기본 3시간 후)"""
+    try:
+        from prophet import Prophet
+        import pandas as pd
+
+        with get_engine().connect() as conn:
+            rows = conn.execute(text("""
+                SELECT recorded_at, temperature, humidity, pm25
+                FROM sensor_combined
+                WHERE pm25 IS NOT NULL
+                  AND recorded_at >= NOW() - INTERVAL '7 days'
+                ORDER BY recorded_at ASC
+            """)).fetchall()
+
+        if len(rows) < 100:
+            return {"error": "데이터 부족 (최소 100개 필요)"}
+
+        df = pd.DataFrame(rows, columns=["ds", "temperature", "humidity", "pm25"])
+        df["ds"] = pd.to_datetime(df["ds"])
+
+        results = {}
+        for col in ["temperature", "humidity", "pm25"]:
+            prophet_df = df[["ds", col]].rename(columns={col: "y"})
+            prophet_df = prophet_df.dropna()
+
+            m = Prophet(
+                changepoint_prior_scale=0.05,
+                seasonality_mode="additive",
+                daily_seasonality=True,
+                weekly_seasonality=True,
+                yearly_seasonality=False,
+            )
+            m.fit(prophet_df)
+
+            future = m.make_future_dataframe(periods=hours, freq="h")
+            forecast = m.predict(future)
+
+            # 마지막 hours개만 추출
+            pred = forecast.tail(hours)[["ds", "yhat", "yhat_lower", "yhat_upper"]]
+            results[col] = [
+                {
+                    "time":  str(r["ds"]),
+                    "value": round(float(r["yhat"]), 1),
+                    "lower": round(float(r["yhat_lower"]), 1),
+                    "upper": round(float(r["yhat_upper"]), 1),
+                }
+                for _, r in pred.iterrows()
+            ]
+
+        return {
+            "forecast_hours": hours,
+            "predictions": results
+        }
+
+    except Exception as e:
+        print(f"[예측 오류] {e}")
+        return {"error": str(e)}
+
 @app.get("/history", summary="기간별 데이터 조회")
 def get_history(range: str = "24h"):
     """range: 24h, 7d, 30d"""
