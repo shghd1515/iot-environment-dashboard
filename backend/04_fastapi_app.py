@@ -62,9 +62,14 @@ scheduler = BackgroundScheduler()
 MODEL_DIR = "models"
 
 class ModelStore:
-    model_temp = model_humi = model_pm25 = None
-    scaler = feature_names = hourly_pattern = None
-    metadata = {}
+    model_temp        = None
+    model_humi        = None
+    model_pm25        = None
+    scaler            = None
+    feature_names     = []
+    feature_names_pm25 = []  # ← 이 줄 추가
+    hourly_pattern    = {}
+    metadata          = {}
 
 store = ModelStore()
 
@@ -78,6 +83,10 @@ def load_models() -> bool:
     store.model_humi    = joblib.load(os.path.join(MODEL_DIR, "model_humi.pkl"))
     store.scaler        = joblib.load(os.path.join(MODEL_DIR, "scaler.pkl"))
     store.feature_names = joblib.load(os.path.join(MODEL_DIR, "feature_names.pkl"))
+    pm25_feat_path = os.path.join(MODEL_DIR, "feature_names_pm25.pkl")
+    if os.path.exists(pm25_feat_path):
+        store.feature_names_pm25 = joblib.load(pm25_feat_path)
+        print(f"[모델] PM2.5 피처: {store.feature_names_pm25}")    
     pm25_path = os.path.join(MODEL_DIR, "model_pm25.pkl")
     if os.path.exists(pm25_path):
         store.model_pm25 = joblib.load(pm25_path)
@@ -252,11 +261,22 @@ def get_recommendation(hour, is_weekend, curr_temp, curr_humi, curr_pm25=0.0):
     row = pd.DataFrame([[feats.get(f, 0.0) for f in store.feature_names]],
                        columns=store.feature_names)
     X_s = store.scaler.transform(row)
-    ml  = {
+
+    # PM2.5 모델은 별도 피처셋 사용
+    if store.model_pm25 and store.feature_names_pm25:
+        row_pm25 = pd.DataFrame(
+            [[feats.get(f, 0.0) for f in store.feature_names_pm25]],
+            columns=store.feature_names_pm25
+        )
+        X_pm25 = row_pm25.values
+        pm25_pred = round(float(store.model_pm25.predict(X_pm25)[0]), 2)
+    else:
+        pm25_pred = curr_pm25
+
+    ml = {
         "temperature": round(float(store.model_temp.predict(X_s)[0]), 2),
         "humidity":    round(float(store.model_humi.predict(X_s)[0]), 2),
-        "pm25":        round(float(store.model_pm25.predict(X_s)[0]), 2)
-                       if store.model_pm25 else curr_pm25,
+        "pm25":        pm25_pred,
     }
     pat    = _pattern()
     n      = store.metadata.get("n_samples", 0)
