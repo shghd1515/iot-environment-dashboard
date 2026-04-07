@@ -10,3 +10,5 @@ scikit-learn
 google-genai>=1.0.0
 apscheduler
 httpx
+xgboost
+lightgbm
