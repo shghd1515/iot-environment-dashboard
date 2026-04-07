@@ -12,4 +12,3 @@ apscheduler
 httpx
 xgboost
 lightgbm
-tensorflow
