@@ -124,6 +124,61 @@ def detect_anomaly(curr_temp, curr_humi, curr_pm25):
     prev_values["humi"] = curr_humi
     prev_values["pm25"] = curr_pm25
 
+def classify_event(curr_temp, curr_humi, curr_pm25):
+    """이상치 패턴 기반 이벤트 자동 분류"""
+    global prev_values
+
+    if prev_values["pm25"] is None or prev_values["temp"] is None:
+        return None
+
+    pm25_change = curr_pm25 - prev_values["pm25"]
+    temp_change = curr_temp - prev_values["temp"]
+    humi_change = curr_humi - prev_values["humi"]
+
+    event = None
+
+    # 요리 감지: PM2.5 급등 + 온도 상승
+    if pm25_change >= 15 and temp_change >= 0.5:
+        event = "요리감지"
+
+    # 청소 감지: PM2.5 급등 + 온도 변화 없음
+    elif pm25_change >= 15 and abs(temp_change) < 0.5:
+        event = "청소감지"
+
+    # 환기 감지: PM2.5 급감 + 온도 하강
+    elif pm25_change <= -10 and temp_change <= -0.5:
+        event = "환기감지"
+
+    # 외출 감지: 온도·습도 동시 하강
+    elif temp_change <= -1.0 and humi_change <= -2.0:
+        event = "외출감지"
+
+    # 귀가 감지: 온도·습도 동시 상승
+    elif temp_change >= 1.0 and humi_change >= 2.0:
+        event = "귀가감지"
+
+    if event:
+        print(f"[이벤트 감지] {event} - PM2.5: {prev_values['pm25']}→{curr_pm25}, 온도: {prev_values['temp']}→{curr_temp}")
+        send_telegram(
+            f"🔍 이벤트 자동 감지!\n"
+            f"유형: {event}\n"
+            f"PM2.5: {prev_values['pm25']} → {curr_pm25} μg/m³\n"
+            f"온도: {prev_values['temp']} → {curr_temp}°C\n"
+            f"대시보드: https://iot-environment-dashboard.onrender.com"
+        )
+        # DB에 이벤트 기록
+        try:
+            with engine.connect() as conn:
+                conn.execute(text(
+                    "UPDATE sensor_combined SET event = :e "
+                    "WHERE id = (SELECT MAX(id) FROM sensor_combined)"
+                ), {"e": event})
+                conn.commit()
+        except Exception as e:
+            print(f"[이벤트 DB 오류] {e}")
+
+    return event
+
 # ── DB 연결 ───────────────────────────────────────────────────────────────────
 def get_engine():
     supabase_url = os.getenv("SUPABASE_DB_URL")
@@ -324,6 +379,7 @@ def auto_control_job():
 
         # ── 이상치 감지 ──────────────────────────────
         detect_anomaly(curr_temp, curr_humi, curr_pm25)
+        classify_event(curr_temp, curr_humi, curr_pm25)  # ← 추가
         # 텔레그램 알림 조건
         if curr_pm25 >= 35:
             send_telegram(
