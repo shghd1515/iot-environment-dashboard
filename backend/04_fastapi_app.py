@@ -780,6 +780,68 @@ def get_weather_forecast():
         print(f"[날씨 예보 오류] {e}")
         return {"error": str(e)}
 
+# 생활기상지수 캐시 (3시간)
+_living_cache = {"data": None, "time": 0}
+
+@app.get("/living-index", summary="생활기상지수 (자외선+대기정체)")
+def get_living_index():
+    import time, xml.etree.ElementTree as ET
+    now_ts = time.time()
+
+    if _living_cache["data"] and now_ts - _living_cache["time"] < 10800:
+        return _living_cache["data"]
+
+    try:
+        from datetime import datetime
+        now = datetime.now()
+        time_str = f"{now.strftime('%Y%m%d')}{(now.hour // 3) * 3:02d}"
+
+        def fetch_index(endpoint):
+            url = f"https://apis.data.go.kr/1360000/LivingWthrIdxServiceV4/{endpoint}"
+            params = {
+                "serviceKey": AIR_API_KEY,
+                "pageNo": 1,
+                "numOfRows": 10,
+                "dataType": "XML",
+                "areaNo": "1100000000",
+                "time": time_str,
+            }
+            r = requests.get(url, params=params, timeout=10)
+            root = ET.fromstring(r.text)
+            item = root.find(".//item")
+            return item
+
+        # 자외선 지수
+        uv_item = fetch_index("getUVIdxV4")
+        uv_now  = uv_item.findtext("h0") if uv_item is not None else None
+        uv_grade = "낮음"
+        if uv_now:
+            uv_val = int(uv_now)
+            uv_grade = "낮음" if uv_val <= 2 else "보통" if uv_val <= 5 else "높음" if uv_val <= 7 else "매우높음" if uv_val <= 10 else "위험"
+
+        # 대기정체지수
+        air_item = fetch_index("getAirDiffusionIdxV4")
+        air_now  = air_item.findtext("h3") if air_item is not None else None
+        air_grade = "좋음"
+        if air_now:
+            air_val = int(air_now)
+            air_grade = "좋음" if air_val <= 25 else "보통" if air_val <= 50 else "나쁨" if air_val <= 75 else "매우나쁨"
+
+        result = {
+            "uv_index":    uv_now,
+            "uv_grade":    uv_grade,
+            "air_stagnation": air_now,
+            "air_grade":   air_grade,
+            "time":        time_str,
+        }
+        _living_cache["data"] = result
+        _living_cache["time"] = now_ts
+        return result
+
+    except Exception as e:
+        print(f"[생활기상지수 오류] {e}")
+        return {"error": str(e)}
+
 @app.get("/history", summary="기간별 데이터 조회")
 def get_history(range: str = "24h"):
     """range: 24h, 7d, 30d"""
