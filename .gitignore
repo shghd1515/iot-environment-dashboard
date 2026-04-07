@@ -3,8 +3,8 @@
 **/.env
 
 # 모델 파일 (용량 큼)
-models/
-**/models/*.pkl
+# models/
+# **/models/*.pkl
 
 # CSV
 sensor_cleaned.csv
