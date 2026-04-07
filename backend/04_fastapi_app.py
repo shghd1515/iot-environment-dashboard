@@ -659,6 +659,47 @@ def detect_anomaly_ae():
         print(f"[Autoencoder 오류] {e}")
         return {"error": str(e)}
 
+# 미세먼지 예보 캐시 (1시간)
+_air_forecast_cache = {"data": None, "time": 0}
+
+@app.get("/air-forecast", summary="미세먼지 예보")
+def get_air_forecast():
+    import time
+    now = time.time()
+
+    if _air_forecast_cache["data"] and now - _air_forecast_cache["time"] < 3600:
+        return _air_forecast_cache["data"]
+
+    try:
+        from datetime import datetime
+        today = datetime.now().strftime("%Y-%m-%d")
+        url = "http://apis.data.go.kr/B552584/ArpltnInforInqireSvc/getMinuDustFrcstDspth"
+        params = {
+            "serviceKey": AIR_API_KEY,
+            "returnType": "json",
+            "numOfRows": 10,
+            "pageNo": 1,
+            "searchDate": today,
+            "InformCode": "PM25",
+        }
+        r = requests.get(url, params=params, timeout=10)
+        items = r.json()["response"]["body"]["items"]
+
+        if items:
+            item = items[0]
+            result = {
+                "date":         item.get("informData"),
+                "grade":        item.get("informGrade", ""),
+                "cause":        item.get("informCause", ""),
+                "overview":     item.get("informOverall", ""),
+            }
+            _air_forecast_cache["data"] = result
+            _air_forecast_cache["time"] = now
+            return result
+    except Exception as e:
+        print(f"[미세먼지 예보 오류] {e}")
+    return {"error": "미세먼지 예보 조회 실패"}
+
 @app.get("/history", summary="기간별 데이터 조회")
 def get_history(range: str = "24h"):
     """range: 24h, 7d, 30d"""
