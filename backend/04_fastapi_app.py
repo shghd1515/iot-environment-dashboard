@@ -12,6 +12,7 @@ Gemini 챗봇 + 자동제어 + 환기 알람 통합
 
 import os, json, math, joblib
 import pandas as pd
+import numpy as np
 import requests
 from datetime import datetime
 from contextlib import asynccontextmanager
@@ -581,6 +582,81 @@ def get_forecast(hours: int = 3):
 
     except Exception as e:
         print(f"[예측 오류] {e}")
+        return {"error": str(e)}
+
+# Autoencoder 이상치 감지
+_ae_model  = None
+_ae_scaler = None
+_ae_meta   = None
+
+def load_autoencoder():
+    global _ae_model, _ae_scaler, _ae_meta
+    try:
+        ae_path = os.path.join(MODEL_DIR, "autoencoder.pkl")
+        if os.path.exists(ae_path):
+            _ae_model  = joblib.load(ae_path)
+            _ae_scaler = joblib.load(os.path.join(MODEL_DIR, "autoencoder_scaler.pkl"))
+            _ae_meta   = joblib.load(os.path.join(MODEL_DIR, "autoencoder_meta.pkl"))
+            print(f"[Autoencoder] 로드 완료 (임계값: {_ae_meta['threshold']:.4f})")
+    except Exception as e:
+        print(f"[Autoencoder] 로드 실패: {e}")
+
+load_autoencoder()
+
+@app.get("/anomaly", summary="Autoencoder 이상치 감지")
+def detect_anomaly_ae():
+    try:
+        if _ae_model is None:
+            return {"error": "Autoencoder 모델 없음"}
+
+        s = get_latest_sensor()
+        if not s:
+            return {"error": "센서 데이터 없음"}
+
+        features = _ae_meta["features"]
+        vals = []
+        for f in features:
+            if f == "hour_sin":
+                from datetime import datetime
+                vals.append(np.sin(2 * np.pi * datetime.now().hour / 24))
+            elif f == "hour_cos":
+                from datetime import datetime
+                vals.append(np.cos(2 * np.pi * datetime.now().hour / 24))
+            elif f == "temp_diff":
+                vals.append(0.0)
+            elif f == "humi_diff":
+                vals.append(0.0)
+            elif f == "pm25_diff":
+                vals.append(0.0)
+            elif f == "temp_ma60":
+                vals.append(s.get("temperature", 22.0))
+            elif f == "humi_ma60":
+                vals.append(s.get("humidity", 50.0))
+            elif f == "pm25_ma60":
+                vals.append(s.get("pm25", 25.0))
+            else:
+                vals.append(s.get(f, 0.0))
+
+        X = np.array([vals])
+        X_scaled = _ae_scaler.transform(X)
+        X_pred   = _ae_model.predict(X_scaled)
+        error    = float(np.mean((X_scaled - X_pred) ** 2))
+        threshold = _ae_meta["threshold"]
+        is_anomaly = error > threshold
+
+        return {
+            "is_anomaly":  is_anomaly,
+            "error":       round(error, 6),
+            "threshold":   round(threshold, 6),
+            "score":       round(error / threshold * 100, 1),
+            "current": {
+                "temperature": s.get("temperature"),
+                "humidity":    s.get("humidity"),
+                "pm25":        s.get("pm25"),
+            }
+        }
+    except Exception as e:
+        print(f"[Autoencoder 오류] {e}")
         return {"error": str(e)}
 
 @app.get("/history", summary="기간별 데이터 조회")
