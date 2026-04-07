@@ -353,7 +353,6 @@ def weekly_report():
 def auto_control_job():
     now = datetime.now()
     print(f"\n[{now.strftime('%Y-%m-%d %H:%M:%S')}] 자동 제어 체크")
-
     try:
         resp = requests.get(f"{API_BASE}/status", timeout=5)
         resp.raise_for_status()
@@ -436,6 +435,24 @@ def auto_control_job():
             "action":     action,
         })
 
+        # ── Autoencoder 이상치 감지 ──────────────────────────────
+        try:
+            import requests as req
+            ae_res = req.get("http://localhost:10000/anomaly", timeout=5)
+            ae_data = ae_res.json()
+            if ae_data.get("is_anomaly") and ae_data.get("score", 0) > 150:
+                send_telegram(
+                    f"🤖 AI 이상치 감지!\n"
+                    f"이상 점수: {ae_data['score']}점 (임계값 100점)\n"
+                    f"온도: {ae_data['current']['temperature']}°C\n"
+                    f"습도: {ae_data['current']['humidity']}%\n"
+                    f"PM2.5: {ae_data['current']['pm25']} μg/m³\n"
+                    f"대시보드: https://iot-environment-dashboard.onrender.com"
+                )
+                log_alert("AI이상치", f"Autoencoder 이상 감지 (점수: {ae_data['score']})", ae_data['score'], 100)
+        except Exception as e:
+            print(f"[Autoencoder 알림 오류] {e}")
+            
     except requests.exceptions.ConnectionError:
         print(f"  [오류] FastAPI 서버 연결 불가 ({API_BASE})")
     except Exception as e:
