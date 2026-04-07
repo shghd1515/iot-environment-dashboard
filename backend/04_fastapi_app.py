@@ -487,58 +487,75 @@ def get_correlation():
 
 @app.get("/forecast", summary="미래 환경 예측")
 def get_forecast(hours: int = 3):
-    """Prophet 기반 시계열 예측 (기본 3시간 후)"""
+    """이동평균 기반 시계열 예측 (가볍고 빠름)"""
     try:
-        from prophet import Prophet
-        import pandas as pd
-
         with get_engine().connect() as conn:
             rows = conn.execute(text("""
                 SELECT recorded_at, temperature, humidity, pm25
                 FROM sensor_combined
                 WHERE pm25 IS NOT NULL
-                  AND recorded_at >= NOW() - INTERVAL '7 days'
-                ORDER BY recorded_at ASC
+                  AND recorded_at >= NOW() - INTERVAL '24 hours'
+                ORDER BY recorded_at DESC
+                LIMIT 60
             """)).fetchall()
 
-        if len(rows) < 100:
-            return {"error": "데이터 부족 (최소 100개 필요)"}
+        if len(rows) < 10:
+            return {"error": "데이터 부족"}
 
-        df = pd.DataFrame(rows, columns=["ds", "temperature", "humidity", "pm25"])
-        df["ds"] = pd.to_datetime(df["ds"])
+        # 최근 데이터로 이동평균 계산
+        temps  = [float(r[1]) for r in rows if r[1]]
+        humis  = [float(r[2]) for r in rows if r[2]]
+        pm25s  = [float(r[3]) for r in rows if r[3]]
 
-        results = {}
-        for col in ["temperature", "humidity", "pm25"]:
-            prophet_df = df[["ds", col]].rename(columns={col: "y"})
-            prophet_df = prophet_df.dropna()
+        # 최근 10개 평균 추세
+        n = min(10, len(temps))
+        avg_temp  = sum(temps[:n])  / n
+        avg_humi  = sum(humis[:n])  / n
+        avg_pm25  = sum(pm25s[:n])  / n
 
-            m = Prophet(
-                changepoint_prior_scale=0.05,
-                seasonality_mode="additive",
-                daily_seasonality=True,
-                weekly_seasonality=True,
-                yearly_seasonality=False,
-            )
-            m.fit(prophet_df)
+        # 추세 계산 (최근 10개 vs 이전 10개)
+        if len(temps) >= 20:
+            prev_temp = sum(temps[n:n*2]) / n
+            prev_humi = sum(humis[n:n*2]) / n
+            prev_pm25 = sum(pm25s[n:n*2]) / n
+            trend_temp = (avg_temp - prev_temp) / n
+            trend_humi = (avg_humi - prev_humi) / n
+            trend_pm25 = (avg_pm25 - prev_pm25) / n
+        else:
+            trend_temp = trend_humi = trend_pm25 = 0
 
-            future = m.make_future_dataframe(periods=hours, freq="h")
-            forecast = m.predict(future)
+        from datetime import datetime, timedelta
+        now = datetime.now()
 
-            # 마지막 hours개만 추출
-            pred = forecast.tail(hours)[["ds", "yhat", "yhat_lower", "yhat_upper"]]
-            results[col] = [
-                {
-                    "time":  str(r["ds"]),
-                    "value": round(float(r["yhat"]), 1),
-                    "lower": round(float(r["yhat_lower"]), 1),
-                    "upper": round(float(r["yhat_upper"]), 1),
-                }
-                for _, r in pred.iterrows()
-            ]
+        predictions = []
+        for h in range(1, hours + 1):
+            future_time = now + timedelta(hours=h)
+            pred_temp = round(avg_temp + trend_temp * h, 1)
+            pred_humi = round(avg_humi + trend_humi * h, 1)
+            pred_pm25 = round(max(0, avg_pm25 + trend_pm25 * h), 1)
+
+            # 건강 점수도 예측
+            health = calc_health_score(pred_temp, pred_humi, pred_pm25)
+
+            predictions.append({
+                "time":        future_time.strftime("%Y-%m-%d %H:%M"),
+                "hour":        f"{h}시간 후",
+                "temperature": pred_temp,
+                "humidity":    pred_humi,
+                "pm25":        pred_pm25,
+                "health_score": health["score"],
+                "health_grade": health["grade"],
+                "health_color": health["color"],
+            })
 
         return {
             "forecast_hours": hours,
-            "predictions": results
+            "current": {
+                "temperature": round(avg_temp, 1),
+                "humidity":    round(avg_humi, 1),
+                "pm25":        round(avg_pm25, 1),
+            },
+            "predictions": predictions
         }
 
     except Exception as e:
