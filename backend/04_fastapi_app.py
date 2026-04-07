@@ -519,6 +519,78 @@ def get_history(range: str = "24h"):
         print(f"[history 오류] {e}")
         return []
 
+def calc_health_score(temp, humi, pm25):
+    """실내 환경 건강 위험도 점수 계산 (0~100)"""
+    score = 100
+
+    # 온도 점수 (최적: 20~24°C)
+    if temp is None:
+        temp_score = 50
+    elif 20 <= temp <= 24:
+        temp_score = 100
+    elif 18 <= temp < 20 or 24 < temp <= 26:
+        temp_score = 80
+    elif 15 <= temp < 18 or 26 < temp <= 28:
+        temp_score = 60
+    elif 10 <= temp < 15 or 28 < temp <= 32:
+        temp_score = 30
+    else:
+        temp_score = 0
+
+    # 습도 점수 (최적: 40~60%)
+    if humi is None:
+        humi_score = 50
+    elif 40 <= humi <= 60:
+        humi_score = 100
+    elif 35 <= humi < 40 or 60 < humi <= 65:
+        humi_score = 80
+    elif 30 <= humi < 35 or 65 < humi <= 70:
+        humi_score = 60
+    elif 20 <= humi < 30 or 70 < humi <= 80:
+        humi_score = 30
+    else:
+        humi_score = 0
+
+    # PM2.5 점수 (좋음: 0~15)
+    if pm25 is None:
+        pm25_score = 50
+    elif pm25 <= 15:
+        pm25_score = 100
+    elif pm25 <= 25:
+        pm25_score = 80
+    elif pm25 <= 35:
+        pm25_score = 60
+    elif pm25 <= 50:
+        pm25_score = 40
+    elif pm25 <= 75:
+        pm25_score = 20
+    else:
+        pm25_score = 0
+
+    # 가중치: PM2.5 50%, 온도 25%, 습도 25%
+    total = round(pm25_score * 0.5 + temp_score * 0.25 + humi_score * 0.25)
+
+    if total >= 90:
+        grade, color, msg = "매우 좋음", "#16A34A", "최적의 실내 환경입니다!"
+    elif total >= 70:
+        grade, color, msg = "좋음", "#65A30D", "쾌적한 환경입니다."
+    elif total >= 50:
+        grade, color, msg = "보통", "#D97706", "약간의 환경 개선이 필요합니다."
+    elif total >= 30:
+        grade, color, msg = "나쁨", "#DC2626", "환경 개선이 필요합니다."
+    else:
+        grade, color, msg = "매우 나쁨", "#7C3AED", "즉시 환기 및 조치가 필요합니다!"
+
+    return {
+        "score":      total,
+        "grade":      grade,
+        "color":      color,
+        "message":    msg,
+        "temp_score": temp_score,
+        "humi_score": humi_score,
+        "pm25_score": pm25_score,
+    }
+
 @app.get("/status", summary="현재 센서값 + AI 권장값", tags=["ML 제어"])
 def get_status():
     s = get_latest_sensor(); now = datetime.now(); w = int(now.weekday() >= 5)
@@ -526,6 +598,7 @@ def get_status():
                              s.get("temperature", 23.0),
                              s.get("humidity", 43.0),
                              s.get("pm25") or 25.0)
+    health = calc_health_score(s.get("temperature"), s.get("humidity"), s.get("pm25"))
     return {
         "current": s,
         "recommendation": {"hour": now.hour, "is_weekend": w, **rec},
@@ -533,7 +606,8 @@ def get_status():
             "temp_diff": round(rec["temperature"] - (s.get("temperature") or 0), 2),
             "humi_diff": round(rec["humidity"]    - (s.get("humidity") or 0),    2),
             "pm25_diff": round(rec["pm25"]        - (s.get("pm25") or 0),        2),
-        }
+        },
+        "health_score": health
     }
 
 @app.post("/predict", summary="조건 기반 ML 예측", tags=["ML 제어"])
