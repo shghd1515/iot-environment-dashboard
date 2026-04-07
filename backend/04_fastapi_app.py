@@ -700,6 +700,86 @@ def get_air_forecast():
         print(f"[미세먼지 예보 오류] {e}")
     return {"error": "미세먼지 예보 조회 실패"}
 
+# 날씨 예보 캐시 (3시간)
+_weather_cache = {"data": None, "time": 0}
+
+@app.get("/weather-forecast", summary="기상청 날씨 예보")
+def get_weather_forecast():
+    import time, xml.etree.ElementTree as ET
+    now_ts = time.time()
+
+    if _weather_cache["data"] and now_ts - _weather_cache["time"] < 10800:
+        return _weather_cache["data"]
+
+    try:
+        from datetime import datetime
+        now = datetime.now()
+        base_date = now.strftime("%Y%m%d")
+        # 발표시간 (02, 05, 08, 11, 14, 17, 20, 23)
+        hour = now.hour
+        base_times = [2, 5, 8, 11, 14, 17, 20, 23]
+        base_time = max([t for t in base_times if t <= hour], default=23)
+        base_time_str = f"{base_time:02d}00"
+
+        url = "http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst"
+        params = {
+            "serviceKey": AIR_API_KEY,
+            "returnType": "XML",
+            "numOfRows": 500,
+            "pageNo": 1,
+            "base_date": base_date,
+            "base_time": base_time_str,
+            "nx": 60,
+            "ny": 127,
+        }
+        r = requests.get(url, params=params, timeout=10)
+        root = ET.fromstring(r.text)
+
+        categories = {
+            "TMP": "temperature",
+            "REH": "humidity",
+            "PTY": "rain_type",
+            "SKY": "sky",
+            "WSD": "wind_speed",
+            "POP": "rain_prob"
+        }
+
+        sky_map  = {"1": "맑음", "3": "구름많음", "4": "흐림"}
+        rain_map = {"0": "없음", "1": "비", "2": "비/눈", "3": "눈", "4": "소나기"}
+
+        results = {}
+        for item in root.findall(".//item"):
+            cat  = item.findtext("category")
+            time_str = item.findtext("fcstTime")
+            val  = item.findtext("fcstValue")
+            if cat in categories:
+                if time_str not in results:
+                    results[time_str] = {"time": time_str}
+                key = categories[cat]
+                if cat == "SKY":
+                    results[time_str][key] = sky_map.get(val, val)
+                elif cat == "PTY":
+                    results[time_str][key] = rain_map.get(val, val)
+                else:
+                    results[time_str][key] = val
+
+        # 현재 시간 이후 6시간치만
+        now_time = now.strftime("%H00")
+        forecasts = [v for k, v in sorted(results.items()) if k >= now_time][:6]
+
+        result = {
+            "base_date": base_date,
+            "base_time": base_time_str,
+            "forecasts": forecasts
+        }
+        _weather_cache["data"] = result
+        _weather_cache["time"] = now_ts
+        return result
+
+    except Exception as e:
+        print(f"[날씨 예보 오류] {e}")
+        return {"error": str(e)}
+
 @app.get("/history", summary="기간별 데이터 조회")
 def get_history(range: str = "24h"):
     """range: 24h, 7d, 30d"""
