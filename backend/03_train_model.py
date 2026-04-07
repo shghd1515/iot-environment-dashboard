@@ -23,13 +23,34 @@ os.makedirs(MODEL_DIR, exist_ok=True)
 FEATURES = [
     "hour_sin", "hour_cos",
     "dow_sin",  "dow_cos",
+    "month_sin", "month_cos",
+    "minute_sin", "minute_cos",
     "is_weekend",
-    "temp_ma60",
-    "humi_ma60",
-    "pm25_ma60",
-    "temp_diff",
-    "humi_diff",
-    "pm25_diff",
+    "time_group",
+    "temp_ma10", "temp_ma30", "temp_ma60", "temp_ma120",
+    "humi_ma10", "humi_ma30", "humi_ma60", "humi_ma120",
+    "pm25_ma10", "pm25_ma30", "pm25_ma60", "pm25_ma120",
+    "temp_diff",  "humi_diff",  "pm25_diff",
+    "temp_diff5", "humi_diff5", "pm25_diff5",
+    "temp_diff10","humi_diff10","pm25_diff10",
+    "temp_accel", "humi_accel", "pm25_accel",
+    "temp_std10", "humi_std10", "pm25_std10",
+    "temp_humi",  "pm25_hour",
+    "has_event",
+]
+
+PM25_FEATURES = [
+    "hour_sin", "hour_cos",
+    "dow_sin",  "dow_cos",
+    "month_sin", "month_cos",
+    "is_weekend",
+    "time_group",
+    "temp_ma60", "humi_ma60",
+    "temp_ma120", "humi_ma120",
+    "temp_diff",  "humi_diff",
+    "temp_diff5", "humi_diff5",
+    "temp_std10", "humi_std10",
+    "temp_humi",
     "has_event",
 ]
 
@@ -78,6 +99,7 @@ def prepare_xy(df: pd.DataFrame):
 PM25_FEATURES = [
     "hour_sin", "hour_cos",
     "dow_sin",  "dow_cos",
+    "month_sin", "month_cos",
     "is_weekend",
     "temp_ma60",
     "humi_ma60",

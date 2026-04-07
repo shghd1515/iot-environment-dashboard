@@ -157,12 +157,12 @@ def remove_outliers(df: pd.DataFrame) -> pd.DataFrame:
 # ── 5. 피처 엔지니어링 ────────────────────────────────────────────────────────
 def add_features(df: pd.DataFrame) -> pd.DataFrame:
     print("\n" + "="*50)
-    print("[5] 피처 엔지니어링")
+    print("[5] 피처 엔지니어링 (강화)")
     print("="*50)
 
     dt = pd.to_datetime(df["recorded_at"])
 
-    # 시간 파생변수
+    # 기본 시간 파생변수
     df["hour"]        = dt.dt.hour
     df["minute"]      = dt.dt.minute
     df["day_of_week"] = dt.dt.dayofweek
@@ -171,24 +171,58 @@ def add_features(df: pd.DataFrame) -> pd.DataFrame:
     df["date"]        = dt.dt.date
 
     # 주기적 인코딩
-    df["hour_sin"] = np.sin(2 * np.pi * df["hour"] / 24)
-    df["hour_cos"] = np.cos(2 * np.pi * df["hour"] / 24)
-    df["dow_sin"]  = np.sin(2 * np.pi * df["day_of_week"] / 7)
-    df["dow_cos"]  = np.cos(2 * np.pi * df["day_of_week"] / 7)
+    df["hour_sin"]   = np.sin(2 * np.pi * df["hour"] / 24)
+    df["hour_cos"]   = np.cos(2 * np.pi * df["hour"] / 24)
+    df["dow_sin"]    = np.sin(2 * np.pi * df["day_of_week"] / 7)
+    df["dow_cos"]    = np.cos(2 * np.pi * df["day_of_week"] / 7)
+    df["month_sin"]  = np.sin(2 * np.pi * df["month"] / 12)
+    df["month_cos"]  = np.cos(2 * np.pi * df["month"] / 12)
+    df["minute_sin"] = np.sin(2 * np.pi * df["minute"] / 60)
+    df["minute_cos"] = np.cos(2 * np.pi * df["minute"] / 60)
 
-    # 이동 평균 (온습도 + 미세먼지)
-    for window in [10, 30, 60]:
+    # 시간대 그룹 (새벽·아침·낮·저녁·밤)
+    def get_time_group(h):
+        if 0  <= h <  6: return 0  # 새벽
+        if 6  <= h < 10: return 1  # 아침
+        if 10 <= h < 14: return 2  # 낮
+        if 14 <= h < 18: return 3  # 오후
+        if 18 <= h < 22: return 4  # 저녁
+        return 5                   # 밤
+    df["time_group"] = df["hour"].apply(get_time_group)
+
+    # 이동 평균 (다양한 구간)
+    for window in [10, 30, 60, 120]:
         df[f"temp_ma{window}"] = df["temperature"].rolling(window, min_periods=1).mean()
         df[f"humi_ma{window}"] = df["humidity"].rolling(window, min_periods=1).mean()
         df[f"pm25_ma{window}"] = df["pm25"].rolling(window, min_periods=1).mean()
 
-    # 변화량
-    df["temp_diff"] = df["temperature"].diff().fillna(0)
-    df["humi_diff"] = df["humidity"].diff().fillna(0)
-    df["pm25_diff"] = df["pm25"].diff().fillna(0)
+    # 변화량 (1분·5분·10분)
+    df["temp_diff"]    = df["temperature"].diff(1).fillna(0)
+    df["humi_diff"]    = df["humidity"].diff(1).fillna(0)
+    df["pm25_diff"]    = df["pm25"].diff(1).fillna(0)
+    df["temp_diff5"]   = df["temperature"].diff(5).fillna(0)
+    df["humi_diff5"]   = df["humidity"].diff(5).fillna(0)
+    df["pm25_diff5"]   = df["pm25"].diff(5).fillna(0)
+    df["temp_diff10"]  = df["temperature"].diff(10).fillna(0)
+    df["humi_diff10"]  = df["humidity"].diff(10).fillna(0)
+    df["pm25_diff10"]  = df["pm25"].diff(10).fillna(0)
 
-    # 이벤트 인코딩 (이벤트 있으면 1, 없으면 0)
-    df["has_event"] = df["event"].notna().astype(int)
+    # 변화 속도 (가속도)
+    df["temp_accel"]  = df["temp_diff"].diff(1).fillna(0)
+    df["humi_accel"]  = df["humi_diff"].diff(1).fillna(0)
+    df["pm25_accel"]  = df["pm25_diff"].diff(1).fillna(0)
+
+    # 롤링 표준편차 (변동성)
+    df["temp_std10"]  = df["temperature"].rolling(10, min_periods=1).std().fillna(0)
+    df["humi_std10"]  = df["humidity"].rolling(10, min_periods=1).std().fillna(0)
+    df["pm25_std10"]  = df["pm25"].rolling(10, min_periods=1).std().fillna(0)
+
+    # 교차 피처
+    df["temp_humi"]   = df["temperature"] * df["humidity"] / 100
+    df["pm25_hour"]   = df["pm25"] * df["hour_sin"]
+
+    # 이벤트 인코딩
+    df["has_event"]   = df["event"].notna().astype(int)
 
     print(f"  추가된 컬럼 수: {df.shape[1]}개")
     print(f"  컬럼 목록: {df.columns.tolist()}")
