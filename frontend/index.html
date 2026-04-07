@@ -844,6 +844,15 @@
         <div style="color:var(--text3);font-size:13px">로딩 중...</div>
       </div>
     </div>
+
+    <!-- 날씨 예보 -->
+    <div class="card">
+      <div class="card-title"><span class="drag-handle">⠿</span> 오늘 날씨 예보 (향후 6시간)</div>
+      <div id="weather-forecast-content">
+        <div style="color:var(--text3);font-size:13px">로딩 중...</div>
+      </div>
+    </div>
+
     <!-- AI 비교 -->
     <div class="card">
       <div class="card-title"><span class="drag-handle">⠿</span> AI 권장값 vs 현재값</div>
@@ -1575,6 +1584,36 @@ async function loadAirForecast() {
 
 loadAirForecast();
 setInterval(loadAirForecast, 3600000);
+
+// ── 날씨 예보 ────────────────────────────────
+async function loadWeatherForecast() {
+  try {
+    const res  = await fetch(`${API}/weather-forecast`);
+    const data = await res.json();
+    if (data.error || !data.forecasts) return;
+
+    const skyIcon = { "맑음": "☀️", "구름많음": "⛅", "흐림": "☁️" };
+    const rainIcon = { "없음": "", "비": "🌧️", "비/눈": "🌨️", "눈": "❄️", "소나기": "🌦️" };
+
+    document.getElementById('weather-forecast-content').innerHTML = `
+      <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px">
+        ${data.forecasts.map(f => `
+          <div style="flex:0 0 auto;min-width:80px;text-align:center;background:var(--surface2);border-radius:10px;padding:10px 8px">
+            <div style="font-size:11px;color:var(--text3);margin-bottom:4px">${f.time.slice(0,2)}시</div>
+            <div style="font-size:20px;margin:4px 0">${skyIcon[f.sky] || "🌤️"}${rainIcon[f.rain_type] || ""}</div>
+            <div style="font-size:15px;font-weight:500;font-family:'DM Mono',monospace">${f.temperature}°</div>
+            <div style="font-size:10px;color:var(--text3);margin-top:4px">💧${f.humidity}%</div>
+            <div style="font-size:10px;color:var(--text3)">🌬️${f.wind_speed}m/s</div>
+            ${f.rain_prob > 0 ? `<div style="font-size:10px;color:var(--humi)">☔${f.rain_prob}%</div>` : ''}
+          </div>
+        `).join('')}
+      </div>
+    `;
+  } catch(e) { console.error('weather-forecast:', e); }
+}
+
+loadWeatherForecast();
+setInterval(loadWeatherForecast, 10800000); // 3시간마다 갱신
 
 // ── 환경 예측 ────────────────────────────────
 async function loadForecast() {
