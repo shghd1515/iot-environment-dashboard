@@ -261,6 +261,7 @@ def get_recommendation(hour, is_weekend, curr_temp, curr_humi, curr_pm25=0.0):
     row = pd.DataFrame([[feats.get(f, 0.0) for f in store.feature_names]],
                        columns=store.feature_names)
     X_s = store.scaler.transform(row)
+    X_s = pd.DataFrame(X_s, columns=store.feature_names)
 
     # PM2.5 모델은 별도 피처셋 사용
     if store.model_pm25 and store.feature_names_pm25:
@@ -268,7 +269,7 @@ def get_recommendation(hour, is_weekend, curr_temp, curr_humi, curr_pm25=0.0):
             [[feats.get(f, 0.0) for f in store.feature_names_pm25]],
             columns=store.feature_names_pm25
         )
-        X_pm25 = row_pm25.values
+        X_pm25 = pd.DataFrame(row_pm25.values, columns=store.feature_names_pm25)
         pm25_pred = round(float(store.model_pm25.predict(X_pm25)[0]), 2)
     else:
         pm25_pred = curr_pm25
