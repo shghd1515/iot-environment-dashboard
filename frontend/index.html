@@ -853,6 +853,23 @@
       </div>
     </div>
 
+    <!-- 생활기상지수 -->
+    <div class="card">
+      <div class="card-title"><span class="drag-handle">⠿</span> 생활기상지수</div>
+      <div class="compare-grid">
+        <div class="compare-item">
+          <div class="compare-item-label">☀️ 자외선 지수</div>
+          <div style="font-size:24px;font-weight:300;font-family:'DM Mono',monospace;margin:8px 0" id="uv-index">--</div>
+          <div style="font-size:12px;font-weight:500" id="uv-grade">-</div>
+        </div>
+        <div class="compare-item">
+          <div class="compare-item-label">🌫️ 대기정체지수</div>
+          <div style="font-size:24px;font-weight:300;font-family:'DM Mono',monospace;margin:8px 0" id="air-stagnation">--</div>
+          <div style="font-size:12px;font-weight:500" id="air-grade">-</div>
+        </div>
+      </div>
+    </div>
+
     <!-- AI 비교 -->
     <div class="card">
       <div class="card-title"><span class="drag-handle">⠿</span> AI 권장값 vs 현재값</div>
@@ -1614,6 +1631,31 @@ async function loadWeatherForecast() {
 
 loadWeatherForecast();
 setInterval(loadWeatherForecast, 10800000); // 3시간마다 갱신
+
+// ── 생활기상지수 ────────────────────────────────
+async function loadLivingIndex() {
+  try {
+    const res  = await fetch(`${API}/living-index`);
+    const data = await res.json();
+    if (data.error) return;
+
+    const gradeColor = {
+      "낮음": "var(--good)", "보통": "var(--moderate)",
+      "높음": "var(--bad)", "매우높음": "var(--bad)", "위험": "#7C3AED",
+      "좋음": "var(--good)", "나쁨": "var(--bad)", "매우나쁨": "#7C3AED"
+    };
+
+    document.getElementById('uv-index').textContent       = data.uv_index ?? '--';
+    document.getElementById('uv-grade').textContent       = data.uv_grade ?? '-';
+    document.getElementById('uv-grade').style.color       = gradeColor[data.uv_grade] || 'var(--text2)';
+    document.getElementById('air-stagnation').textContent = data.air_stagnation ?? '--';
+    document.getElementById('air-grade').textContent      = data.air_grade ?? '-';
+    document.getElementById('air-grade').style.color      = gradeColor[data.air_grade] || 'var(--text2)';
+  } catch(e) { console.error('living-index:', e); }
+}
+
+loadLivingIndex();
+setInterval(loadLivingIndex, 10800000); // 3시간마다 갱신
 
 // ── 환경 예측 ────────────────────────────────
 async function loadForecast() {
