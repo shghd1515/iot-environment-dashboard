@@ -765,7 +765,7 @@ def get_weather_forecast():
 
         # 현재 시간 이후 6시간치만
         now_time = now.strftime("%H00")
-        forecasts = [v for k, v in sorted(results.items()) if k >= now_time][:6]
+        forecasts = [v for k, v in sorted(results.items()) if k >= now_time][:12]
 
         result = {
             "base_date": base_date,
