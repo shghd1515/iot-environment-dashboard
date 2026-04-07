@@ -837,6 +837,13 @@
       </div>
       <div style="font-size:11px;color:var(--text3);margin-top:8px" id="outdoor-time">측정소: - | 측정시각: -</div>
     </div>
+    <!-- 미세먼지 예보 -->
+    <div class="card">
+      <div class="card-title"><span class="drag-handle">⠿</span> 오늘 미세먼지 예보</div>
+      <div id="air-forecast-content">
+        <div style="color:var(--text3);font-size:13px">로딩 중...</div>
+      </div>
+    </div>
     <!-- AI 비교 -->
     <div class="card">
       <div class="card-title"><span class="drag-handle">⠿</span> AI 권장값 vs 현재값</div>
@@ -1534,6 +1541,40 @@ async function loadCorrelation() {
 
 loadCorrelation();
 setInterval(loadCorrelation, 300000);
+
+// ── 미세먼지 예보 ────────────────────────────────
+async function loadAirForecast() {
+  try {
+    const res  = await fetch(`${API}/air-forecast`);
+    const data = await res.json();
+    if (data.error) return;
+
+    const gradeMap = { "좋음": "good", "보통": "moderate", "나쁨": "bad", "매우나쁨": "very-bad" };
+    const seoulGrade = (data.grade.match(/서울\s*:\s*(\S+)/) || [])[1] || "-";
+    const gradeClass = gradeMap[seoulGrade] || "moderate";
+
+    document.getElementById('air-forecast-content').innerHTML = `
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+        <span class="pm-badge ${gradeClass}" style="font-size:14px;padding:6px 14px">
+          서울 ${seoulGrade}
+        </span>
+        <span style="font-size:12px;color:var(--text3)">${data.date} 예보</span>
+      </div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.7;margin-bottom:8px">
+        ${data.overview || ""}
+      </div>
+      <div style="font-size:11px;color:var(--text3);line-height:1.6">
+        ${data.cause || ""}
+      </div>
+      <div style="margin-top:10px;font-size:11px;color:var(--text3)">
+        ${data.grade.split(",").map(g => `<span style="margin-right:8px">${g.trim()}</span>`).join("")}
+      </div>
+    `;
+  } catch(e) { console.error('air-forecast:', e); }
+}
+
+loadAirForecast();
+setInterval(loadAirForecast, 3600000);
 
 // ── 환경 예측 ────────────────────────────────
 async function loadForecast() {
