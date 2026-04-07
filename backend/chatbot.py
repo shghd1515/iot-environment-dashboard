@@ -143,20 +143,21 @@ def build_context() -> str:
     hourly = get_hourly_data()
     now    = datetime.now()
 
-    pm25_val   = s.get("pm25") or 0
-    temp_val   = s.get("temperature") or 0
-    humi_val   = s.get("humidity") or 0
+    pm25_val = s.get("pm25") or 0
+    temp_val = s.get("temperature") or 0
+    humi_val = s.get("humidity") or 0
 
     event_text = "\n".join(
         f"  {e['recorded_at']}: {e['event']} (온도 {e['temperature']}°C, PM2.5 {e['pm25']})"
         for e in events
     ) or "없음"
 
-    # 이상 패턴 분석
+    # 24시간 패턴 분석
     pattern_text = "데이터 없음"
+    trend_text   = "데이터 없음"
     if len(hourly) >= 3:
-        pm25_list  = [h["pm25"] for h in hourly if h["pm25"] is not None]
-        temp_list  = [h["temperature"] for h in hourly if h["temperature"] is not None]
+        pm25_list = [h["pm25"] for h in hourly if h["pm25"] is not None]
+        temp_list = [h["temperature"] for h in hourly if h["temperature"] is not None]
         if pm25_list:
             avg_pm25 = sum(pm25_list) / len(pm25_list)
             max_pm25 = max(pm25_list)
@@ -166,20 +167,58 @@ def build_context() -> str:
             avg_temp = sum(temp_list) / len(temp_list)
             pattern_text += f"\n  온도 평균 {avg_temp:.1f}°C (24시간 기준)"
 
-    # 환경 개선 추천 힌트
+        # 트렌드 분석 (최근 3시간 vs 이전 3시간)
+        if len(hourly) >= 6:
+            recent  = hourly[:3]
+            prev    = hourly[3:6]
+            r_pm25  = [h["pm25"] for h in recent if h["pm25"] is not None]
+            p_pm25  = [h["pm25"] for h in prev   if h["pm25"] is not None]
+            r_temp  = [h["temperature"] for h in recent if h["temperature"] is not None]
+            p_temp  = [h["temperature"] for h in prev   if h["temperature"] is not None]
+            if r_pm25 and p_pm25:
+                pm25_trend = sum(r_pm25)/len(r_pm25) - sum(p_pm25)/len(p_pm25)
+                trend_text = f"PM2.5 {'상승 ↑' if pm25_trend > 2 else '하락 ↓' if pm25_trend < -2 else '안정 →'} ({pm25_trend:+.1f} μg/m³)"
+            if r_temp and p_temp:
+                temp_trend = sum(r_temp)/len(r_temp) - sum(p_temp)/len(p_temp)
+                trend_text += f" / 온도 {'상승 ↑' if temp_trend > 0.5 else '하락 ↓' if temp_trend < -0.5 else '안정 →'} ({temp_trend:+.1f}°C)"
+
+    # 건강 위험도 점수 계산
+    def calc_score(t, h, p):
+        ts = 100 if 20<=t<=24 else 80 if 18<=t<=26 else 60 if 15<=t<=28 else 30
+        hs = 100 if 40<=h<=60 else 80 if 35<=h<=65 else 60 if 30<=h<=70 else 30
+        ps = 100 if p<=15 else 80 if p<=25 else 60 if p<=35 else 40 if p<=50 else 20 if p<=75 else 0
+        return round(ps*0.5 + ts*0.25 + hs*0.25)
+
+    health_score = calc_score(temp_val, humi_val, pm25_val)
+    health_grade = "매우 좋음" if health_score>=90 else "좋음" if health_score>=70 else "보통" if health_score>=50 else "나쁨" if health_score>=30 else "매우 나쁨"
+
+    # Autoencoder 이상치 점수
+    ae_text = "정보 없음"
+    try:
+        import requests as req
+        ae_res  = req.get("http://localhost:10000/anomaly", timeout=3)
+        ae_data = ae_res.json()
+        if ae_data.get("is_anomaly"):
+            ae_text = f"⚠️ 이상 감지! 이상 점수 {ae_data['score']}점 (정상 범위 초과)"
+        else:
+            ae_text = f"✅ 정상 패턴 (이상 점수 {ae_data.get('score', 0)}점)"
+    except:
+        pass
+
+    # 환경 개선 추천
     recommendations = []
     if pm25_val >= 35:
-        recommendations.append("미세먼지가 나쁨 수준입니다. 환기를 권장합니다.")
+        recommendations.append(f"PM2.5 {pm25_val}μg/m³ - 즉시 환기 권장 (목표: 15μg/m³ 이하)")
     if pm25_val >= 75:
-        recommendations.append("미세먼지가 매우 나쁨 수준입니다. 즉시 환기하고 마스크 착용을 권장합니다.")
+        recommendations.append("PM2.5 매우 나쁨 - 마스크 착용 및 외출 자제 권장")
     if temp_val >= 28:
-        recommendations.append("실내 온도가 높습니다. 냉방 또는 환기를 권장합니다.")
+        recommendations.append(f"온도 {temp_val}°C - 냉방 또는 환기로 24°C 이하로 낮추세요")
     if temp_val <= 15:
-        recommendations.append("실내 온도가 낮습니다. 난방을 권장합니다.")
+        recommendations.append(f"온도 {temp_val}°C - 난방으로 20°C 이상으로 높이세요")
     if humi_val >= 70:
-        recommendations.append("습도가 높습니다. 제습기 사용 또는 환기를 권장합니다.")
+        recommendations.append(f"습도 {humi_val}% - 제습기 사용으로 60% 이하로 낮추세요")
     if humi_val <= 30:
-        recommendations.append("습도가 낮습니다. 가습기 사용을 권장합니다.")
+        recommendations.append(f"습도 {humi_val}% - 가습기 사용으로 40% 이상으로 높이세요")
     if not recommendations:
         recommendations.append("현재 실내 환경은 전반적으로 양호합니다.")
 
@@ -196,9 +235,16 @@ def build_context() -> str:
 - 습도: {humi_val}%
 - PM2.5: {pm25_val} μg/m³ ({pm25_grade(pm25_val)})
 - PM10: {s.get('pm10', 'N/A')} μg/m³
+- 건강 위험도: {health_score}점 ({health_grade})
 
-## 24시간 환경 패턴 분석
+## 24시간 환경 패턴
 {pattern_text}
+
+## 최근 3시간 트렌드
+{trend_text}
+
+## AI 이상치 감지 (Autoencoder)
+{ae_text}
 
 ## AI 환경 개선 추천
 {recommendation_text}
@@ -209,13 +255,15 @@ def build_context() -> str:
 ## AI 자동제어 시스템 정보
 - 매일 오후 2시 15분 환기 알람 자동 실행
 - 1분마다 온도·습도·미세먼지 자동 제어 판단
-- ML 모델로 시간대별 최적 환경값 예측
+- XGBoost/LightGBM ML 모델로 시간대별 최적 환경값 예측
+- Autoencoder로 비정상 환경 패턴 자동 감지
 - 미세먼지 기준: 좋음(0~15) / 보통(15~35) / 나쁨(35~75) / 매우나쁨(75+)
 
 ## 답변 가이드
-- 현재 수치를 언급하며 구체적으로 답변하세요
+- 현재 수치와 건강 위험도 점수를 언급하며 구체적으로 답변하세요
+- 트렌드가 악화 중이면 선제적 조치를 권장하세요
+- AI 이상치 감지 결과가 있으면 언급하세요
 - 환기 필요 시 예상 효과를 수치로 제시하세요
-- 이벤트 패턴이 있으면 언급하세요
 - 행동 추천은 명확하고 실용적으로 하세요
 """.strip()
 
