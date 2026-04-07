@@ -751,6 +751,15 @@
         </div>
       </div>
     </div>
+    <!-- 환경 예측 -->
+    <div class="card">
+      <div class="card-title"><span class="drag-handle">⠿</span> 환경 예측 (향후 3시간)</div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap" id="forecast-cards">
+        <div class="compare-item" style="flex:1;min-width:140px;text-align:center">
+          <div class="compare-item-label">로딩 중...</div>
+        </div>
+      </div>
+    </div>
     <!-- 현재 수치 -->
     <div class="metrics-grid">
       <div class="metric-card temp">
@@ -1525,6 +1534,33 @@ async function loadCorrelation() {
 
 loadCorrelation();
 setInterval(loadCorrelation, 300000);
+
+// ── 환경 예측 ────────────────────────────────
+async function loadForecast() {
+  try {
+    const res  = await fetch(`${API}/forecast?hours=3`);
+    const data = await res.json();
+    if (data.error) return;
+
+    const container = document.getElementById('forecast-cards');
+    container.innerHTML = data.predictions.map(p => `
+      <div class="compare-item" style="flex:1;min-width:140px;text-align:center">
+        <div class="compare-item-label">${p.hour}</div>
+        <div style="font-size:22px;font-weight:500;color:${p.health_color};margin:8px 0">${p.health_score}점</div>
+        <div style="font-size:12px;font-weight:500;color:${p.health_color};margin-bottom:8px">${p.health_grade}</div>
+        <div style="font-size:11px;color:var(--text3);line-height:1.8">
+          🌡️ ${p.temperature}°C<br>
+          💧 ${p.humidity}%<br>
+          🌫️ PM2.5 ${p.pm25}
+        </div>
+        <div style="font-size:10px;color:var(--text3);margin-top:6px">${p.time.slice(11,16)}</div>
+      </div>
+    `).join('');
+  } catch(e) { console.error('forecast:', e); }
+}
+
+loadForecast();
+setInterval(loadForecast, 60000);
 
 // 초기 차트 로드
 switchRange('24h');
