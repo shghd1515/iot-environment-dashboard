@@ -1,15 +1,7 @@
 """
 03_train_model.py
 sensor_cleaned.csv를 읽어 ML 모델 학습 후 저장
-
-변경사항:
-  - 미세먼지(pm25, pm10) 피처 추가
-  - pm25 예측 모델 추가
-  - 이벤트(has_event) 피처 추가
-
-실행:
-    pip install scikit-learn joblib pandas
-    python 03_train_model.py
+XGBoost / LightGBM / RandomForest / GradientBoosting 4개 모델 비교 후 최적 선택
 """
 
 import os
@@ -21,12 +13,13 @@ from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from sklearn.model_selection import cross_val_score
 from sklearn.metrics import mean_absolute_error, r2_score
 from sklearn.preprocessing import StandardScaler
+from xgboost import XGBRegressor
+from lightgbm import LGBMRegressor
 
 CSV_PATH  = "sensor_cleaned.csv"
 MODEL_DIR = "models"
 os.makedirs(MODEL_DIR, exist_ok=True)
 
-# 모델 입력 피처
 FEATURES = [
     "hour_sin", "hour_cos",
     "dow_sin",  "dow_cos",
@@ -41,14 +34,12 @@ FEATURES = [
 ]
 
 
-# ── 1. 데이터 로드 ────────────────────────────────────────────────────────────
 def load_data() -> pd.DataFrame:
     df = pd.read_csv(CSV_PATH, parse_dates=["recorded_at"])
     print(f"[로드] {len(df):,} 행  /  기간: {df['recorded_at'].min()} ~ {df['recorded_at'].max()}")
     return df
 
 
-# ── 2. 시간대별 평균 패턴 ─────────────────────────────────────────────────────
 def make_hourly_pattern(df: pd.DataFrame) -> pd.DataFrame:
     cols = {"temperature": "target_temp", "humidity": "target_humi"}
     if "pm25" in df.columns:
@@ -64,7 +55,6 @@ def make_hourly_pattern(df: pd.DataFrame) -> pd.DataFrame:
     return pattern
 
 
-# ── 3. 학습 데이터 준비 ───────────────────────────────────────────────────────
 def prepare_xy(df: pd.DataFrame):
     available = [f for f in FEATURES if f in df.columns]
     missing   = [f for f in FEATURES if f not in df.columns]
@@ -84,32 +74,61 @@ def prepare_xy(df: pd.DataFrame):
     print(f"[준비] 학습 샘플: {len(X):,}  /  피처: {available}")
     return X, yt, yh, yp, available
 
+# PM2.5 전용 피처 (누수 피처 제외)
+PM25_FEATURES = [
+    "hour_sin", "hour_cos",
+    "dow_sin",  "dow_cos",
+    "is_weekend",
+    "temp_ma60",
+    "humi_ma60",
+    "temp_diff",
+    "humi_diff",
+    "has_event",
+]
 
-# ── 4. 모델 학습 ──────────────────────────────────────────────────────────────
 def train_model(X, y, target_name: str):
     print(f"\n  [{target_name}] 모델 학습 중...")
 
-    rf = RandomForestRegressor(
-        n_estimators=200, max_depth=8,
-        min_samples_leaf=3, random_state=42, n_jobs=-1,
-    )
-    gb = GradientBoostingRegressor(
-        n_estimators=200, max_depth=4,
-        learning_rate=0.05, subsample=0.8, random_state=42,
-    )
+    models = {
+        "RandomForest": RandomForestRegressor(
+            n_estimators=200, max_depth=8,
+            min_samples_leaf=3, random_state=42, n_jobs=-1,
+        ),
+        "GradientBoosting": GradientBoostingRegressor(
+            n_estimators=200, max_depth=4,
+            learning_rate=0.05, subsample=0.8, random_state=42,
+        ),
+        "XGBoost": XGBRegressor(
+            n_estimators=200, max_depth=4,
+            learning_rate=0.05, subsample=0.8,
+            colsample_bytree=0.8, random_state=42,
+            verbosity=0, n_jobs=-1,
+        ),
+        "LightGBM": LGBMRegressor(
+            n_estimators=200, max_depth=4,
+            learning_rate=0.05, subsample=0.8,
+            colsample_bytree=0.8, random_state=42,
+            verbosity=-1, n_jobs=-1,
+        ),
+    }
 
-    cv_rf = -cross_val_score(rf, X, y, cv=5, scoring="neg_mean_absolute_error")
-    cv_gb = -cross_val_score(gb, X, y, cv=5, scoring="neg_mean_absolute_error")
+    best_model = None
+    best_name  = None
+    best_mae   = float("inf")
+    all_metrics = {}
 
-    print(f"    RandomForest   CV MAE: {cv_rf.mean():.4f} ± {cv_rf.std():.4f}")
-    print(f"    GradientBoost  CV MAE: {cv_gb.mean():.4f} ± {cv_gb.std():.4f}")
+    for name, model in models.items():
+        cv_scores = -cross_val_score(model, X, y, cv=5, scoring="neg_mean_absolute_error")
+        mean_mae  = cv_scores.mean()
+        all_metrics[name] = round(float(mean_mae), 4)
+        print(f"    {name:<20} CV MAE: {mean_mae:.4f} ± {cv_scores.std():.4f}")
 
-    if cv_rf.mean() <= cv_gb.mean():
-        best_model, chosen = rf, "RandomForest"
-    else:
-        best_model, chosen = gb, "GradientBoosting"
+        if mean_mae < best_mae:
+            best_mae   = mean_mae
+            best_model = model
+            best_name  = name
 
-    print(f"    선택된 모델: {chosen}")
+    print(f"    ✅ 선택된 모델: {best_name} (MAE: {best_mae:.4f})")
     best_model.fit(X, y)
 
     pred = best_model.predict(X)
@@ -117,11 +136,15 @@ def train_model(X, y, target_name: str):
     r2   = r2_score(y, pred)
     print(f"    최종 MAE: {mae:.4f}  /  R²: {r2:.4f}")
 
-    return best_model, {"model": chosen, "cv_mae": round(float(cv_rf.mean()), 4),
-                        "mae": round(mae, 4), "r2": round(r2, 4)}
+    return best_model, {
+        "model":    best_name,
+        "cv_mae":   round(best_mae, 4),
+        "mae":      round(mae, 4),
+        "r2":       round(r2, 4),
+        "all_models": all_metrics,
+    }
 
 
-# ── 5. 피처 중요도 출력 ───────────────────────────────────────────────────────
 def print_feature_importance(model, feature_names: list, target: str):
     if not hasattr(model, "feature_importances_"):
         return
@@ -132,9 +155,8 @@ def print_feature_importance(model, feature_names: list, target: str):
         print(f"    {feat:<15} {val:.4f}  {bar}")
 
 
-# ── 메인 ─────────────────────────────────────────────────────────────────────
 def main():
-    print("===== 모델 학습 시작 =====\n")
+    print("===== XGBoost/LightGBM 포함 모델 학습 시작 =====\n")
 
     df = load_data()
     make_hourly_pattern(df)
@@ -154,13 +176,16 @@ def main():
     model_humi, metrics_humi = train_model(X_scaled, yh, "습도")
     print_feature_importance(model_humi, feature_names, "습도")
 
-    # 미세먼지 모델
+    # PM2.5 모델 (누수 피처 제외)
     metrics_pm25 = {}
     if yp is not None:
-        print("\n[PM2.5 모델]")
-        model_pm25, metrics_pm25 = train_model(X_scaled, yp, "PM2.5")
-        print_feature_importance(model_pm25, feature_names, "PM2.5")
+        print("\n[PM2.5 모델] (누수 피처 제외)")
+        pm25_feats = [f for f in PM25_FEATURES if f in feature_names]
+        X_pm25 = X_scaled[pm25_feats]
+        model_pm25, metrics_pm25 = train_model(X_pm25, yp, "PM2.5")
+        print_feature_importance(model_pm25, pm25_feats, "PM2.5")
         joblib.dump(model_pm25, os.path.join(MODEL_DIR, "model_pm25.pkl"))
+        joblib.dump(pm25_feats, os.path.join(MODEL_DIR, "feature_names_pm25.pkl"))
 
     # 저장
     joblib.dump(model_temp,    os.path.join(MODEL_DIR, "model_temp.pkl"))
@@ -182,6 +207,10 @@ def main():
 
     print(f"\n===== 학습 완료 =====")
     print(f"저장 위치: {MODEL_DIR}/")
+    print(f"\n모델 성능 요약:")
+    for target, metrics in [("온도", metrics_temp), ("습도", metrics_humi), ("PM2.5", metrics_pm25)]:
+        if metrics:
+            print(f"  {target}: {metrics.get('model')} (CV MAE: {metrics.get('cv_mae')})")
 
 
 if __name__ == "__main__":

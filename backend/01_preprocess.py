@@ -24,12 +24,14 @@ load_dotenv()
 
 # ── 0. DB 연결 ────────────────────────────────────────────────────────────────
 def get_engine():
-    host     = os.getenv("DB_HOST",     "192.168.101.2")
-    port     = os.getenv("DB_PORT",     "3307")
-    user     = os.getenv("DB_USER",     "root01")
-    password = os.getenv("DB_PASSWORD", "00000")
-    dbname   = os.getenv("DB_NAME",     "sensor_db")
-    url = f"mysql+pymysql://{user}:{password}@{host}:{port}/{dbname}?charset=utf8mb4"
+    supabase_url = os.getenv("SUPABASE_DB_URL")
+    if supabase_url:
+        return create_engine(supabase_url, pool_pre_ping=True)
+    url = (
+        f"mysql+pymysql://{os.getenv('DB_USER','root01')}:{os.getenv('DB_PASSWORD','00000')}"
+        f"@{os.getenv('DB_HOST','192.168.101.2')}:{os.getenv('DB_PORT','3307')}"
+        f"/{os.getenv('DB_NAME','sensor_db')}?charset=utf8mb4"
+    )
     return create_engine(url, pool_pre_ping=True)
 
 
@@ -77,6 +79,10 @@ def handle_missing(df: pd.DataFrame) -> pd.DataFrame:
     print("\n" + "="*50)
     print("[2] 결측값 처리")
     print("="*50)
+    # PM2.5 null 행 제거 (센서 미연결 기간 데이터 제외)
+    before = len(df)
+    df = df[df["pm25"].notna() & (df["pm25"] > 0)]
+    print(f"  PM2.5 없는 행 제거: {before - len(df)}행 제거 → {len(df)}행 남음")
 
     missing_before = df[['temperature', 'humidity', 'pm1', 'pm25', 'pm10']].isnull().sum().sum()
     print(f"  처리 전 결측값 총계: {missing_before}")
