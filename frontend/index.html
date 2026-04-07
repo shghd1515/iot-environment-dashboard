@@ -700,7 +700,57 @@
 
   <!-- ── 메인 패널 ── -->
   <div class="main-panel">
+    <!-- 건강 위험도 점수 -->
+    <div class="card" style="background: linear-gradient(135deg, var(--surface) 0%, var(--surface2) 100%);">
+      <div class="card-title"><span class="drag-handle">⠿</span> 실내 환경 건강 위험도</div>
+      <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">
+        <!-- 점수 원형 -->
+        <div style="position:relative;width:120px;height:120px;flex-shrink:0">
+          <svg viewBox="0 0 120 120" style="width:120px;height:120px;transform:rotate(-90deg)">
+            <circle cx="60" cy="60" r="50" fill="none" stroke="var(--border)" stroke-width="10"/>
+            <circle cx="60" cy="60" r="50" fill="none" stroke-width="10"
+              id="health-circle"
+              stroke-dasharray="314"
+              stroke-dashoffset="314"
+              stroke-linecap="round"
+              style="transition:stroke-dashoffset 1s ease, stroke 0.5s"/>
+          </svg>
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center">
+            <div style="font-size:28px;font-weight:300;font-family:'DM Mono',monospace;line-height:1" id="health-score">--</div>
+            <div style="font-size:10px;color:var(--text3);margin-top:2px">/ 100</div>
+          </div>
+        </div>
 
+        <!-- 상세 정보 -->
+        <div style="flex:1;min-width:200px">
+          <div style="font-size:20px;font-weight:500;margin-bottom:6px" id="health-grade">--</div>
+          <div style="font-size:13px;color:var(--text2);margin-bottom:16px" id="health-message">--</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:12px;color:var(--text3);width:60px">🌡️ 온도</span>
+              <div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden">
+                <div id="bar-temp-score" style="height:100%;border-radius:3px;background:#E85D24;transition:width 0.5s"></div>
+              </div>
+              <span style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;width:30px;text-align:right" id="temp-score-val">--</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:12px;color:var(--text3);width:60px">💧 습도</span>
+              <div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden">
+                <div id="bar-humi-score" style="height:100%;border-radius:3px;background:#2563EB;transition:width 0.5s"></div>
+              </div>
+              <span style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;width:30px;text-align:right" id="humi-score-val">--</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:12px;color:var(--text3);width:60px">🌫️ PM2.5</span>
+              <div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden">
+                <div id="bar-pm25-score" style="height:100%;border-radius:3px;background:#854F0B;transition:width 0.5s"></div>
+              </div>
+              <span style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;width:30px;text-align:right" id="pm25-score-val">--</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
     <!-- 현재 수치 -->
     <div class="metrics-grid">
       <div class="metric-card temp">
@@ -1019,6 +1069,29 @@ async function loadStatus() {
     const data = await res.json();
     recommendation = data.recommendation || {};
     updateComparison(data.current, data.recommendation);
+
+    // 건강 위험도 점수 업데이트
+    const hs = data.health_score;
+    if (hs) {
+      document.getElementById('health-score').textContent = hs.score;
+      document.getElementById('health-grade').textContent = hs.grade;
+      document.getElementById('health-grade').style.color = hs.color;
+      document.getElementById('health-message').textContent = hs.message;
+
+      // 원형 게이지
+      const circle = document.getElementById('health-circle');
+      const offset = 314 - (314 * hs.score / 100);
+      circle.style.strokeDashoffset = offset;
+      circle.style.stroke = hs.color;
+
+      // 세부 점수 바
+      document.getElementById('bar-temp-score').style.width  = hs.temp_score + '%';
+      document.getElementById('bar-humi-score').style.width  = hs.humi_score + '%';
+      document.getElementById('bar-pm25-score').style.width  = hs.pm25_score + '%';
+      document.getElementById('temp-score-val').textContent  = hs.temp_score;
+      document.getElementById('humi-score-val').textContent  = hs.humi_score;
+      document.getElementById('pm25-score-val').textContent  = hs.pm25_score;
+    }
   } catch(e) { console.error('status:', e); }
 }
 
