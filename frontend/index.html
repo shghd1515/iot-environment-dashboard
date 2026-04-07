@@ -856,16 +856,18 @@
     <!-- 생활기상지수 -->
     <div class="card">
       <div class="card-title"><span class="drag-handle">⠿</span> 생활기상지수</div>
-      <div class="compare-grid">
-        <div class="compare-item">
+      <div style="display:flex;gap:12px">
+        <div class="compare-item" style="flex:1">
           <div class="compare-item-label">☀️ 자외선 지수</div>
-          <div style="font-size:24px;font-weight:300;font-family:'DM Mono',monospace;margin:8px 0" id="uv-index">--</div>
-          <div style="font-size:12px;font-weight:500" id="uv-grade">-</div>
+          <div style="font-size:32px;font-weight:300;font-family:'DM Mono',monospace;margin:12px 0" id="uv-index">--</div>
+          <div style="font-size:13px;font-weight:500" id="uv-grade">-</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:6px">0~2: 낮음 / 3~5: 보통 / 6~7: 높음 / 8+: 매우높음</div>
         </div>
-        <div class="compare-item">
+        <div class="compare-item" style="flex:1">
           <div class="compare-item-label">🌫️ 대기정체지수</div>
-          <div style="font-size:24px;font-weight:300;font-family:'DM Mono',monospace;margin:8px 0" id="air-stagnation">--</div>
-          <div style="font-size:12px;font-weight:500" id="air-grade">-</div>
+          <div style="font-size:32px;font-weight:300;font-family:'DM Mono',monospace;margin:12px 0" id="air-stagnation">--</div>
+          <div style="font-size:13px;font-weight:500" id="air-grade">-</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:6px">0~25: 좋음 / 26~50: 보통 / 51~75: 나쁨 / 76+: 매우나쁨</div>
         </div>
       </div>
     </div>
